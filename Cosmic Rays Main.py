@@ -8,6 +8,8 @@ from astropy import constants as con
 from astropy import units as u
 
 # %%
+
+### Unit conversions and constants, soon to be removed in favor of using astropy units and constants
 # cm per pc
 cm_pc = 3.086*10**18
 
