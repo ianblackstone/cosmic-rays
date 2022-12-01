@@ -7,30 +7,8 @@ from scipy.optimize import fsolve
 from astropy import constants as con
 from astropy import units as u
 
-# %%
-
-### Unit conversions and constants, soon to be removed in favor of using astropy units and constants
-# cm per pc
-cm_pc = 3.086*10**18
-
-# g per solar mass
-g_Msun = 1.988*10**33
-
-# (ergs/s) / L_Sun
-L_sun_conversion = 3.826*10**33
-
-h = 6.6261*(10**(-27))
-
-c = 2.99792458*(10**10)
-
-G = 6.67259*(10**-8)
-
-sigmaSB = 5.67037441918442945397*10**-5
-
-protonMass = 1.672621911*10**-24
-
 # Pion lifetime in years
-pion_lifetime = 5*10**7
+pion_lifetime = 5*10**7 * u.yr
 
 # %%
 # Set fiducial values
@@ -86,8 +64,8 @@ class model:
             sweepUpMass (boolean, optional): Boolean to enable the sweeping up of additional mass in the model. Defaults to sweepUpMassFiducial.
         """
         self.name = name
-        self.meanFreePath = meanFreePath * cm_pc
-        self.gasColumnHeight = gasColumnHeight * cm_pc
+        self.meanFreePath = (meanFreePath * u.pc).cgs
+        self.gasColumnHeight = (gasColumnHeight * u.pc).cgs
         self.windToCREnergyFraction = windToCREnergyFraction
         self.coverageFraction = coverageFraction
         self.energyInjection = energyInjection
@@ -125,18 +103,18 @@ class regionData:
         """
         self.name = name
         self.age = age
-        self.luminosity = luminosity * L_sun_conversion
-        self.energyDotWind = energyDotWind
-        self.radius = radius * cm_pc
-        self.radiusOldStars = radiusOldStars * cm_pc
-        self.massShell = massShell * g_Msun
-        self.massNewStars = massNewStars * g_Msun
-        self.massOldStars = massOldStars * g_Msun
+        self.luminosity = (luminosity * u.solLum).cgs
+        self.energyDotWind = (energyDotWind * u.solLum).cgs
+        self.radius = (radius * u.pc).cgs
+        self.radiusOldStars = (radiusOldStars * u.pc).cgs
+        self.massShell = (massShell * u.solMass).cgs
+        self.massNewStars = (massNewStars * u.solMass).cgs
+        self.massOldStars = (massOldStars * u.solMass).cgs
         self.massTotal = self.massNewStars + self.massShell
         self.gasDensity = gasDensity
         self.electronDensity = self.massShell / \
             (4/3*np.pi*(self.radius)**3) / \
-            protonMass
+            con.m_p.cgs
         self.pionTime = pion_lifetime / self.electronDensity
 
     def __str__(self):
@@ -152,8 +130,8 @@ fiducial = model("fiducial")
 
 # Define regions.
 ###############################################################################
-testRegion = regionData("Test Region", age=1, luminosity=2.3*10**8, energyDotWind=9.565*10**37, radius=10,
-                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=10**4, gasDensity=0)
+testRegion = regionData("Test Region", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
 
 
 # %%
@@ -166,7 +144,7 @@ def getMinimumTime(rShell, vShell, model):
         rShell (number): The radius of the shell in cm
         vShell (number): The velocity of the shell in cm/s
         model (model): The current model
-
+0
     Returns:
         number: The minimum time scale.
     """
@@ -189,35 +167,33 @@ def getDVDR(rShell, X, region, model):
     Returns:
         array of numbers: Returns [dv/dr, dp/dr, dt/dr]
     """
-
     vShell, pCR, t = X
 
     dpdr = 0
 
     if model.energyInjection:
         dpdr += model.windToCREnergyFraction * \
-            region.energyDotWind / (4 * np.pi * rShell**3 * vShell)
+            region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
 
     if model.advectionPressure:
         dpdr -= 4 * pCR / rShell
 
     if model.diffusionPressure:
-        dpdr -= c * model.meanFreePath * pCR / (vShell * rShell**2)
+        dpdr -= con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
 
     if model.streamPressure:
         dpdr -= 0  # To-Do
 
     dpdr = dpdr / vShell
 
-    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell*vShell) - G*(region.massShell + region.massNewStars +
-                                                                      region.massOldStars*(min(rShell, region.radiusOldStars)/region.radiusOldStars)**3)/(vShell*rShell**2)
+    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
 
     # Old dvdr that uses P ~ Edot * t
     # dvdr =  model.windToCREnergyFraction*region.energyDotWind*model.coverageFraction / rShell /(region.massShell*vShell) * getMinimumTime(rShell, vShell, model.meanFreePath, region.pionTime) - G*(region.massShell + region.massNewStars)/(vShell*rShell**2)
 
     if model.sweepUpMass:
-        dvdr -= vShell*4*np.pi*region.gasDensity * \
-            (rShell - model.gasColumnHeight)**2 / region.massShell
+        dvdr -= vShell*4*np.pi*region.gasDensity.value * \
+            (rShell - model.gasColumnHeight.value)**2 / region.massShell.value
 
     dtdr = 1/vShell
 
@@ -255,19 +231,21 @@ def getDVDR(rShell, X, region, model):
 model = fiducial
 region = testRegion
 
-v0 = 10**-4
-t0 = 10**6
-p0 = 10**-11
+v0 = (10**-4 * u.cm/u.s).value
+t0 = (10**6 * u.yr).value
+p0 = (10**-11 * u.Ba).value
 
 X0 = [v0, p0, t0]
 
-rSpan = [model.gasColumnHeight, 1000*region.radius]
+rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
 r = np.linspace(rSpan[0], rSpan[1], 2000)
 
 print(str(model))
 print(str(region))
+
+# %%
 ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, args=[
-                          region, model], max_step=cm_pc, rtol=1)
+                          region, model], max_step=(1 * u.pc).cgs.value, rtol=1)
 
 
 # Plots
@@ -279,7 +257,7 @@ ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, args=[
 
 fig, ax = plt.subplots(dpi=200)
 
-plt.plot(ODESolve.t/cm_pc, ODESolve.y[0]/10**5, label=r"$v$")
+plt.plot(ODESolve.t, ODESolve.y[0]/10**5, label=r"$v$")
 # plt.plot(ODESolve.t/cm_pc, c/10**5 * model.meanFreePath / (3*ODESolve.t), label = r"$v_{\rm crit}$")
 
 plt.xscale('log')
@@ -298,5 +276,47 @@ plt.ylabel("Velocity (km/s)")
 
 # plt.legend()
 
+# %%
+
+## Diagnostic plot of the ODEs
+################################################
+
+fig, ax1 = plt.subplots(dpi = 200)
+
+r = ODESolve.t * u.cm
+v = ODESolve.y[0] * u.cm / u.s
+p = ODESolve.y[1] * u.Ba
+t = ODESolve.y[2] * u.yr
+
+dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
+
+energyInjection = model.windToCREnergyFraction * \
+            region.energyDotWind / (4 * np.pi * r**3 * v)
+
+advectionPressure = -4 * p / r
+
+diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
+
+ax2 = plt.twinx(ax1)
+
+ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
+ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
+ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
+ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
+
+ax1.set_xscale('log')
+ax1.set_yscale('log')
+ax2.set_yscale('symlog')
+
+ax1.set_ylim(5*10**-12, 2*10**-11)
+# ax2.set_ylim(-2*10**-16, 10**-15)
+
+ax1.set_xlabel(u.pc)
+ax1.set_ylabel(p.unit)
+ax2.set_ylabel(diffusionPressure.cgs.unit)
+
+ax1.legend()
+ax2.legend()
 
 # %%
