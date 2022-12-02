@@ -125,7 +125,8 @@ class regionData:
 ###############################################################################
 # Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
 fiducial = model("fiducial")
-
+fiducialOnlyAdvection = model("Only advection", energyInjection=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
+fiducialNoDiffusion = model("No diffusion", diffusionPressure=False)
 ###############################################################################
 
 # Define regions.
@@ -184,8 +185,6 @@ def getDVDR(rShell, X, region, model):
     if model.streamPressure:
         dpdr -= 0  # To-Do
 
-    dpdr = dpdr / vShell
-
     dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
 
     # Old dvdr that uses P ~ Edot * t
@@ -231,9 +230,9 @@ def getDVDR(rShell, X, region, model):
 model = fiducial
 region = testRegion
 
-v0 = (10**-4 * u.cm/u.s).value
+v0 = (10**5 * u.cm/u.s).value
 t0 = (10**6 * u.yr).value
-p0 = (10**-11 * u.Ba).value
+p0 = (10**-10 * u.Ba).value
 
 X0 = [v0, p0, t0]
 
@@ -257,22 +256,27 @@ ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, args=[
 
 fig, ax = plt.subplots(dpi=200)
 
-plt.plot(ODESolve.t, ODESolve.y[0]/10**5, label=r"$v$")
+r = (ODESolve.t * u.cm).to(u.pc)
+v = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
+p = ODESolve.y[1] * u.Ba
+t = p = ODESolve.y[2] * u.yr
+
+plt.plot(r, v, label=r"$v$")
 # plt.plot(ODESolve.t/cm_pc, c/10**5 * model.meanFreePath / (3*ODESolve.t), label = r"$v_{\rm crit}$")
 
 plt.xscale('log')
-plt.yscale('log')
+# plt.yscale('log')
 
-plt.ylim(1)
+# plt.ylim(1)
 
 # plt.text(0.01, 0.9, '{}'.format(str(model)), transform = ax.transAxes)
-plt.text(0.7, 0.17, r'$M_{\rm Star}\, 10^4\,M_\odot$', transform=ax.transAxes)
-plt.text(0.7, 0.1, r'$M_{\rm shell}\, 10^4\,M_\odot$', transform=ax.transAxes)
-plt.text(0.7, 0.03,
-         r'$\dot{E}_{\rm CR}\, 2.5\times 10^3\, L_\odot$', transform=ax.transAxes)
+# plt.text(0.7, 0.17, r'$M_{\rm Star}\, 10^4\,M_\odot$', transform=ax.transAxes)
+# plt.text(0.7, 0.1, r'$M_{\rm shell}\, 10^4\,M_\odot$', transform=ax.transAxes)
+# plt.text(0.7, 0.03,
+#          r'$\dot{E}_{\rm CR}\, 2.5\times 10^3\, L_\odot$', transform=ax.transAxes)
 
-plt.xlabel("Distance (pc)")
-plt.ylabel("Velocity (km/s)")
+plt.xlabel(f"Distance ({r.unit})")
+plt.ylabel(f"Velocity ({v.unit})")
 
 # plt.legend()
 
@@ -281,42 +285,42 @@ plt.ylabel("Velocity (km/s)")
 ## Diagnostic plot of the ODEs
 ################################################
 
-fig, ax1 = plt.subplots(dpi = 200)
+# fig, ax1 = plt.subplots(dpi = 200)
 
-r = ODESolve.t * u.cm
-v = ODESolve.y[0] * u.cm / u.s
-p = ODESolve.y[1] * u.Ba
-t = ODESolve.y[2] * u.yr
+# r = ODESolve.t * u.cm
+# v = ODESolve.y[0] * u.cm / u.s
+# p = ODESolve.y[1] * u.Ba
+# t = ODESolve.y[2] * u.yr
 
-dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
+# dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
 
-energyInjection = model.windToCREnergyFraction * \
-            region.energyDotWind / (4 * np.pi * r**3 * v)
+# energyInjection = model.windToCREnergyFraction * \
+#             region.energyDotWind / (4 * np.pi * r**3 * v)
 
-advectionPressure = -4 * p / r
+# advectionPressure = -4 * p / r
 
-diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
+# diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
 
-ax2 = plt.twinx(ax1)
+# ax2 = plt.twinx(ax1)
 
-ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
-ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
-ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
-ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
-ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
+# ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+# ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
+# ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
+# ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
+# ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
 
-ax1.set_xscale('log')
-ax1.set_yscale('log')
-ax2.set_yscale('symlog')
+# ax1.set_xscale('log')
+# ax1.set_yscale('log')
+# ax2.set_yscale('symlog')
 
-ax1.set_ylim(5*10**-12, 2*10**-11)
+# ax1.set_ylim(5*10**-12, 2*10**-11)
 # ax2.set_ylim(-2*10**-16, 10**-15)
 
-ax1.set_xlabel(u.pc)
-ax1.set_ylabel(p.unit)
-ax2.set_ylabel(diffusionPressure.cgs.unit)
+# ax1.set_xlabel(f"Distance ({u.pc})")
+# ax1.set_ylabel(f"Pressure ({p.unit})")
+# ax2.set_ylabel(f"dP/dr ({diffusionPressure.cgs.unit})")
 
-ax1.legend()
-ax2.legend()
+# ax1.legend()
+# ax2.legend()
 
 # %%
