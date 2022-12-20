@@ -17,6 +17,9 @@ meanFreePathFiducial = 0.01  # pc
 gasColumnHeightFiducial = 10  # pc
 windToCREnergyFractionFiducial = 0.1  # Fraction
 coverageFractionFiducial = 1  # Fraction
+vInitialFiducial = 10 # km/s
+tInitialFiducial = 0 # yr
+eddRatioFiducial = 1
 
 # Turn on or off various pressures in the model.
 energyInjectionFiducial = True
@@ -45,29 +48,35 @@ sweepUpMassFiducial = False
 
 class model:
     # All units read from a model are cgs unless specified. Inputs are in more convenient units.
-    def __init__(self, name, meanFreePath=meanFreePathFiducial, gasColumnHeight=gasColumnHeightFiducial, windToCREnergyFraction=windToCREnergyFractionFiducial,
-                 coverageFraction=coverageFractionFiducial, energyInjection=energyInjectionFiducial, advectionPressure=advectionPressureFiducial,
+    def __init__(self, name, meanFreePath=meanFreePathFiducial, gasColumnHeight=gasColumnHeightFiducial, windToCREnergyFraction=windToCREnergyFractionFiducial, vInitial = vInitialFiducial, tInitial = tInitialFiducial,
+                 coverageFraction=coverageFractionFiducial, eddRatio = eddRatioFiducial, energyInjection=energyInjectionFiducial, advectionPressure=advectionPressureFiducial,
                  diffusionPressure=diffusionPressureFiducial, pionPressure=pionPressureFiducial, streamPressure=streamPressureFiducial, sweepUpMass=sweepUpMassFiducial):
-        """_summary_
+        """A model object contains the base data and parameters not related to region data for calculations.
 
         Args:
             name (string): The name of the model
-            meanFreePath (number, optional): mean free path. Input in parsecs, will be converted to cm and a unit label added. Defaults to meanFreePathFiducial.
-            gasColumnHeight (number, optional): Initial column height in parsecs. Defaults to gasColumnHeightFiducial.
-            windToCREnergyFraction (number, optional): Parameter for what fraction of wind energy is converted to CR energy. Defaults to windToCREnergyFractionFiducial.
-            coverageFraction (number, 0 to 1, optional): Shell coverage fraction. Defaults to coverageFractionFiducial.
-            energyInjection (boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
-            advectionPressure (boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
-            diffusionPressure (boolean, optional): Boolean to enable diffusion in the model. Defaults to diffusionPressureFiducial.
-            pionPressure (boolean, optional): Boolean to enable pion decay in the model. Defaults to pionPressureFiducial.
-            streamPressure (boolean, optional): Boolean to enable streaming in the model, not currently implemented. Defaults to streamPressureFiducial.
-            sweepUpMass (boolean, optional): Boolean to enable the sweeping up of additional mass in the model. Defaults to sweepUpMassFiducial.
+            meanFreePath (Float, optional): mean free path. Input in parsecs, will be converted to cm and a unit label added. Defaults to meanFreePathFiducial.
+            gasColumnHeight (Float, optional): Initial column height. Input in parsecs, will be converted to cm and a unit label added. Defaults to gasColumnHeightFiducial.
+            vInitial (Float, optional): Initial velocity. Input in km/s, will be converted to cm/s and a unit label added. Defaults to vInitialFiducial.
+            tInitial (Float, optional): Initial age of the cluster. Input in yr, will be converted to s and a unit label added. Defaults to tInitialFiducial. Not currently used.
+            windToCREnergyFraction (Float, optional): Parameter for what fraction of wind energy is converted to CR energy. Defaults to windToCREnergyFractionFiducial.
+            coverageFraction (Float, optional): Shell coverage fraction. Defaults to coverageFractionFiducial.
+            eddRatio (Float, optional): The initial Eddington ratio. Defaults to eddRatioFiducial.
+            energyInjection (Boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
+            advectionPressure (Boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
+            diffusionPressure (Boolean, optional): Boolean to enable diffusion in the model. Defaults to diffusionPressureFiducial.
+            pionPressure (Boolean, optional): Boolean to enable pion decay in the model. Defaults to pionPressureFiducial.
+            streamPressure (Boolean, optional): Boolean to enable streaming in the model, not currently implemented. Defaults to streamPressureFiducial.
+            sweepUpMass (Boolean, optional): Boolean to enable the sweeping up of additional mass in the model. Defaults to sweepUpMassFiducial.
         """
         self.name = name
         self.meanFreePath = (meanFreePath * u.pc).cgs
         self.gasColumnHeight = (gasColumnHeight * u.pc).cgs
         self.windToCREnergyFraction = windToCREnergyFraction
         self.coverageFraction = coverageFraction
+        self.eddRatio = eddRatio
+        self.vInitial = (vInitial * u.km / u.s).cgs
+        self.tInitial = (tInitial * u.yr).cgs
         self.energyInjection = energyInjection
         self.advectionPressure = advectionPressure
         self.diffusionPressure = diffusionPressure
@@ -85,21 +94,22 @@ class regionData:
         """_summary_
 
         Args:
-            name (string): The region name or reference.
-            age (number): Region age. Input in Myr, unit will be assigned to it.
-            luminosity (number): Stellar luminosity of the region. Input in solar luminosities, unit will be assigned to it.
-            energyDotWind (number): The energy input to the region from stellar wind. Input in solar luminosities, unit will be assigned to it.
-            radius (number): The radius of the region. Input in pc, unit will be assigned to it. Currently not used in favor of the model's gasColumnHeight.
-            radiusOldStars (number): The radius of the old stellar population. Input in pc, unit will be assigned to it.
-            massShell (number): The mass of the gas shell. Input in solar masses, unit will be assigned to it.
-            massNewStars (number): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it.
-            massOldStars (number): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total.
-            gasDensity (number): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in ____. Not currently used.
+            name (String): The region name or reference.
+            age (Float): Region age. Input in Myr, unit will be assigned to it.
+            luminosity (Float): Stellar luminosity of the region. Input in solar luminosities, unit will be assigned to it.
+            energyDotWind (Float): The energy input to the region from stellar wind. Input in solar luminosities, unit will be assigned to it.
+            radius (Float): The radius of the region. Input in pc, unit will be assigned to it. Currently not used in favor of the model's gasColumnHeight.
+            radiusOldStars (Float): The radius of the old stellar population. Input in pc, unit will be assigned to it.
+            massShell (Float): The mass of the gas shell. Input in solar masses, unit will be assigned to it.
+            massNewStars (Float): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it.
+            massOldStars (Float): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total.
+            gasDensity (Float): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in ____. Not currently used.
 
         Additional parameters (automatically calculated):
-            massTotal (number): The total region mass in grams.
-            electronDensity (number): The electron number density in n/cm^3. Not currently used but important for pion losses.
-            pionTime (number): The pion timescale in s. Not currently used.
+            massTotal (Float): The total region mass in grams.
+            electronDensity (Float): The electron number density in n/cm^3. Not currently used but important for pion losses.
+            pionTime (Float): The pion timescale in s. Not currently used.
+            eddPressure (Float): The Eddington pressure for the initial region conditions, in Bayres.
         """
         self.name = name
         self.age = age
@@ -116,6 +126,7 @@ class regionData:
             (4/3*np.pi*(self.radius)**3) / \
             con.m_p.cgs
         self.pionTime = pion_lifetime / self.electronDensity
+        self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * np.pi * self.radius**4)).to(u.Ba)
 
     def __str__(self):
         return f"Region: {self.name}"
@@ -127,6 +138,8 @@ class regionData:
 fiducial = model("fiducial")
 fiducialOnlyAdvection = model("Only advection", energyInjection=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
 fiducialNoDiffusion = model("No diffusion", diffusionPressure=False)
+fiducialOnlyInput = model("Only energy injection", advectionPressure=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
+fiducialNoAdvection = model("No advection", advectionPressure=False)
 ###############################################################################
 
 # Define regions.
@@ -145,11 +158,11 @@ def getMinimumTime(rShell, vShell, model):
         rShell (number): The radius of the shell in cm
         vShell (number): The velocity of the shell in cm/s
         model (model): The current model
-0
+
     Returns:
         number: The minimum time scale.
     """
-    tDiff = 3*rShell**2 / (c * model.meanFreePath)
+    tDiff = 3*rShell**2 / (con.c * model.meanFreePath)
     tAdv = rShell/vShell
     pionTime = np.inf  # Not currently accounted for
 
@@ -161,7 +174,7 @@ def getDVDR(rShell, X, region, model):
 
     Args:
         rShell (number): The radius of the shell in cm
-        X (array of numbers): An array with the current value of [vShell, pCR, t].
+        X (array): An array with the current value of [vShell, pCR, t].
         region (region): The current region
         model (model): The current model
 
@@ -185,7 +198,8 @@ def getDVDR(rShell, X, region, model):
     if model.streamPressure:
         dpdr -= 0  # To-Do
 
-    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
+    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - \
+        con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
 
     # Old dvdr that uses P ~ Edot * t
     # dvdr =  model.windToCREnergyFraction*region.energyDotWind*model.coverageFraction / rShell /(region.massShell*vShell) * getMinimumTime(rShell, vShell, model.meanFreePath, region.pionTime) - G*(region.massShell + region.massNewStars)/(vShell*rShell**2)
@@ -194,7 +208,7 @@ def getDVDR(rShell, X, region, model):
         dvdr -= vShell*4*np.pi*region.gasDensity.value * \
             (rShell - model.gasColumnHeight.value)**2 / region.massShell.value
 
-    dtdr = 1/vShell
+    dtdr = 1/abs(vShell)
 
     return dvdr, dpdr, dtdr
 
@@ -230,14 +244,9 @@ def getDVDR(rShell, X, region, model):
 model = fiducial
 region = testRegion
 
-v0 = (10**5 * u.cm/u.s).value
-t0 = (10**6 * u.yr).value
-p0 = (10**-10 * u.Ba).value
-
-X0 = [v0, p0, t0]
+X0 = [model.vInitial.value, model.eddRatio* 2 * region.eddPressure.value, model.tInitial.value]
 
 rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
-r = np.linspace(rSpan[0], rSpan[1], 2000)
 
 print(str(model))
 print(str(region))
@@ -259,7 +268,7 @@ fig, ax = plt.subplots(dpi=200)
 r = (ODESolve.t * u.cm).to(u.pc)
 v = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
 p = ODESolve.y[1] * u.Ba
-t = p = ODESolve.y[2] * u.yr
+t = ODESolve.y[2] * u.yr
 
 plt.plot(r, v, label=r"$v$")
 # plt.plot(ODESolve.t/cm_pc, c/10**5 * model.meanFreePath / (3*ODESolve.t), label = r"$v_{\rm crit}$")
@@ -285,42 +294,79 @@ plt.ylabel(f"Velocity ({v.unit})")
 ## Diagnostic plot of the ODEs
 ################################################
 
-# fig, ax1 = plt.subplots(dpi = 200)
+fig, ax1 = plt.subplots(dpi = 200)
 
-# r = ODESolve.t * u.cm
-# v = ODESolve.y[0] * u.cm / u.s
-# p = ODESolve.y[1] * u.Ba
-# t = ODESolve.y[2] * u.yr
+r = ODESolve.t * u.cm
+v = ODESolve.y[0] * u.cm / u.s
+p = ODESolve.y[1] * u.Ba
+t = ODESolve.y[2] * u.yr
 
-# dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
+dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
 
-# energyInjection = model.windToCREnergyFraction * \
-#             region.energyDotWind / (4 * np.pi * r**3 * v)
+energyInjection = model.windToCREnergyFraction * \
+            region.energyDotWind / (4 * np.pi * r**3 * v)
 
-# advectionPressure = -4 * p / r
+advectionPressure = -4 * p / r
 
-# diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
+diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
 
-# ax2 = plt.twinx(ax1)
+ax2 = plt.twinx(ax1)
 
-# ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
-# ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
-# ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
-# ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
-# ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
+ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
+ax2.plot(r.to(u.pc).value, energyInjection.cgs + advectionPressure.cgs + diffusionPressure.cgs, 'k--', label = "all pressures")
+ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
+ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
+ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
 
-# ax1.set_xscale('log')
-# ax1.set_yscale('log')
-# ax2.set_yscale('symlog')
+ax1.set_xscale('log')
+ax1.set_yscale('log')
+ax2.set_yscale('symlog')
 
 # ax1.set_ylim(5*10**-12, 2*10**-11)
-# ax2.set_ylim(-2*10**-16, 10**-15)
+ax2.set_ylim(-10**-30, 10**-30)
 
-# ax1.set_xlabel(f"Distance ({u.pc})")
-# ax1.set_ylabel(f"Pressure ({p.unit})")
-# ax2.set_ylabel(f"dP/dr ({diffusionPressure.cgs.unit})")
+ax1.set_xlabel(f"Distance ({u.pc})")
+ax1.set_ylabel(f"Pressure ({p.unit})")
+ax2.set_ylabel(f"dP/dr ({diffusionPressure.cgs.unit})")
 
-# ax1.legend()
-# ax2.legend()
+ax1.legend(loc = 8)
+ax2.legend()
+
+# %%
+
+## Diagnostic plot of the ODEs
+################################################
+
+fig, ax1 = plt.subplots(dpi = 200)
+
+r = ODESolve.t * u.cm
+v = ODESolve.y[0] * u.cm / u.s
+p = ODESolve.y[1] * u.Ba
+t = ODESolve.y[2] * u.yr
+
+force = (p * 4 * np.pi * r**2).cgs
+gravity = (con.G * region.massNewStars * region.massShell / r**2).cgs
+
+ax2 = plt.twinx(ax1)
+
+ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+ax2.plot(r.to(u.pc).value, force.value, 'k', label = r"p4$\pi r^2$")
+ax2.plot(r.to(u.pc).value, gravity.value, 'r', label = "Gravity")
+
+ax1.set_xscale('log')
+ax1.set_yscale('log')
+ax2.set_yscale('log')
+
+# ax1.set_ylim(5*10**-12, 2*10**-11)
+# ax2.set_ylim(-10**-30, 10**-30)
+
+ax1.set_xlabel(f"Distance ({u.pc})")
+ax1.set_ylabel(f"Pressure ({p.unit})")
+ax2.set_ylabel(f"Force ({force.cgs.unit})")
+
+ax1.legend(loc = 8)
+ax2.legend()
+
 
 # %%
