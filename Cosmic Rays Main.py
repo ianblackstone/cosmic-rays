@@ -270,7 +270,12 @@ v = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
 p = ODESolve.y[1] * u.Ba
 t = ODESolve.y[2] * u.yr
 
+initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
+
+analyticVelocity = np.sqrt(initialForce * 4 * np.pi * r / region.massShell - con.G * (region.massNewStars + region.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
+
 plt.plot(r, v, label=r"$v$")
+plt.plot(r, analyticVelocity, label = r"Analytic velocity")
 # plt.plot(ODESolve.t/cm_pc, c/10**5 * model.meanFreePath / (3*ODESolve.t), label = r"$v_{\rm crit}$")
 
 plt.xscale('log')
@@ -287,7 +292,7 @@ plt.xscale('log')
 plt.xlabel(f"Distance ({r.unit})")
 plt.ylabel(f"Velocity ({v.unit})")
 
-# plt.legend()
+plt.legend()
 
 # %%
 
@@ -345,12 +350,17 @@ v = ODESolve.y[0] * u.cm / u.s
 p = ODESolve.y[1] * u.Ba
 t = ODESolve.y[2] * u.yr
 
+initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
+
+analyticPressure =  initialForce / (4*np.pi*r**2)
+
 force = (p * 4 * np.pi * r**2).cgs
-gravity = (con.G * region.massNewStars * region.massShell / r**2).cgs
+gravity = (con.G * (region.massNewStars + region.massShell) * region.massShell / r**2).cgs
 
 ax2 = plt.twinx(ax1)
 
 ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+ax1.plot(r.to(u.pc).value, analyticPressure.cgs.value, label = "Analytic pressure")
 ax2.plot(r.to(u.pc).value, force.value, 'k', label = r"p4$\pi r^2$")
 ax2.plot(r.to(u.pc).value, gravity.value, 'r', label = "Gravity")
 
