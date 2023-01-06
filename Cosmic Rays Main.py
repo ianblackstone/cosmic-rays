@@ -131,6 +131,50 @@ class regionData:
     def __str__(self):
         return f"Region: {self.name}"
 
+class results:
+    def __init__(self, model = None, region = None, file = None):
+        """Holds the results and methods for printing, saving, and loading them.
+         
+         Args:
+            model (model): A model object
+            region (region): A region object
+        """
+        if file is None:
+            # if model or region is None:
+            #     raise Exception("Results must either have models and regions, or a filepath")
+
+            self.name = model.name + " " + region.name
+            self.model = model
+            self.region = region
+
+            self.calculate()
+        else:
+            self.load(file)
+        
+
+    def calculate(self):
+        """Calculates the results for a given model and region
+        
+        Args:
+            model (model): A model object
+            region (region): A region object
+        """
+        ODESolve = solveODE(self.model, self.region)
+
+        self.radius = ODESolve.t
+        self.velocity = ODESolve.y[0]
+        self.pressure = ODESolve.y[1]
+        self.time = ODESolve.y[2]
+
+    def save():
+        pass
+
+    def load(self, file):
+        pass
+
+    def plot():
+        pass
+        
 
 # Define models
 ###############################################################################
@@ -237,6 +281,30 @@ def getDVDR(rShell, X, region, model):
 
     # return criticalRadius
 
+# %%
+# Define a function to return the ODE result
+def solveODE(model, region, verbose = True):
+    """Returns the ODEs for a given model and region
+
+    Args:
+        model (_type_): A model object
+        region (_type_): a region object.
+        verbose (bool, optional): Whether to be verbose during run. Defaults to True.
+
+    Returns:
+        _type_: _description_
+    """
+    X0 = [model.vInitial.value, model.eddRatio* 2 * region.eddPressure.value, model.tInitial.value]
+
+    rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
+
+    if verbose:
+        print("Calculating ODE for " + str(model) + " " + str(region))
+
+    ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, args=[
+                            region, model], max_step=(1 * u.pc).cgs.value, rtol=1)
+
+    return ODESolve
 
 # %%
 # Fill out current model and region
@@ -244,16 +312,6 @@ def getDVDR(rShell, X, region, model):
 model = fiducial
 region = testRegion
 
-X0 = [model.vInitial.value, model.eddRatio* 2 * region.eddPressure.value, model.tInitial.value]
-
-rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
-
-print(str(model))
-print(str(region))
-
-# %%
-ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, args=[
-                          region, model], max_step=(1 * u.pc).cgs.value, rtol=1)
 
 
 # Plots
