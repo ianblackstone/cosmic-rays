@@ -150,7 +150,9 @@ class results:
             self.calculate()
         else:
             self.load(file)
-        
+    
+    def __getItem__(self, key):
+        return self.item[key]
 
     def calculate(self):
         """Calculates the results for a given model and region
@@ -161,10 +163,15 @@ class results:
         """
         ODESolve = solveODE(self.model, self.region)
 
-        self.radius = ODESolve.t
-        self.velocity = ODESolve.y[0]
-        self.pressure = ODESolve.y[1]
-        self.time = ODESolve.y[2]
+        r = (ODESolve.t * u.cm).to(u.pc)
+        v = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
+        p = ODESolve.y[1] * u.Ba
+        t = ODESolve.y[2] * u.yr
+
+        self.radius = (ODESolve.t * u.cm).to(u.pc)
+        self.velocity = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
+        self.pressure = ODESolve.y[1] * u.Ba
+        self.time = (ODESolve.y[2] * u.s).to(u.yr)
 
     def save():
         pass
@@ -172,25 +179,61 @@ class results:
     def load(self, file):
         pass
 
-    def plot():
-        pass
-        
+    def plot(self, x, y, *z, scale = None):
+        """_summary_
 
-# Define models
-###############################################################################
-# Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
-fiducial = model("fiducial")
-fiducialOnlyAdvection = model("Only advection", energyInjection=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
-fiducialNoDiffusion = model("No diffusion", diffusionPressure=False)
-fiducialOnlyInput = model("Only energy injection", advectionPressure=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
-fiducialNoAdvection = model("No advection", advectionPressure=False)
-###############################################################################
+        Args:
+            x (string): _description_
+            y (string): _description_
+            z (string): 
+            scale (_type_, optional): _description_. Defaults to None.
+        """
+        multiplot = len(z) != 0
 
-# Define regions.
-###############################################################################
-testRegion = regionData("Test Region", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
-                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
+        X = getattr(self, x)
+        Y = getattr(self, y)
 
+        if multiplot:
+            
+
+            fig, ax1 = plt.subplots(dpi = 200)
+            ax2 = plt.twinx(ax1)
+
+            ax1.plot(X.value, Y.value, label = y)
+            
+            for i, arg in enumerate(z):
+                Z = getattr(self, arg)
+                ax2.plot(X.value, Z.value, linestyle = "--", label = f"{z[i]}")
+
+            if scale != None:
+                ax1.set_xscale(scale)
+                ax1.set_yscale(scale)
+                ax2.set_yscale(scale)
+
+
+            ax1.set_xlabel(f"{x} ({X.unit})")
+            ax1.set_ylabel(f"{y} ({Y.unit})")
+            ax2.set_ylabel(f"{z[0]} ({Z[0].cgs.unit})")
+
+            ax1.legend()
+            ax2.legend()
+
+        else:
+            plt.figure(dpi = 200)
+            plt.title(self.name)
+            plt.plot(getattr(self, x), getattr(self, y), label = y)
+
+            plt.xlabel(f"{x} ({getattr(self, x).unit})")
+            plt.ylabel(f"{y} ({getattr(self, y).unit})")
+
+            if scale != None:
+                plt.xscale(scale)
+                plt.yscale(scale)
+
+        # for arg in z:
+        #     plt.plot(getattr(self, x), getattr(self, arg), label = arg)
+        # if len(z) > 0:
+        #     plt.legend()
 
 # %%
 # Define timescale functions
@@ -256,30 +299,6 @@ def getDVDR(rShell, X, region, model):
 
     return dvdr, dpdr, dtdr
 
-# %%
-# Define quantity functions - Not currently used
-###############################################################################
-
-# def getLGamma(Edot_cr, t_diff, t_pion):
-
-#     L_gamma = Edot_cr/3 * np.minimum(1,t_diff/t_pion)
-
-#     return L_gamma
-
-# def getPCR(Edot_cr, t, V):
-#     P_cr = Edot_cr * t / (3*V)
-#     return P_cr
-
-# Find the critical , not giving the right answer probably a math error.
-# def getCritRadius(region, model):
-
-#     func = lambda R: 3 * region.energyDotWind * model.windToCREnergyFraction / (region.massShell * c * model.meanFreePath) * R**4 * (1 - region.radius**2 / R**2) - G * region.massTotal / region.radius * R**2 * (1 - region.radius / R) - c**2 * model.meanFreePath**2 / 9
-
-#     criticalRadius = fsolve(func, 5*region.radius)
-
-    # criticalRadius = np.sqrt(region.massShell * model.meanFreePath * c * G * region.massTotal/(region.energyDotWind * model.windToCREnergyFraction * region.radius) * (1 + np.sqrt(1 + (4*region.energyDotWind * region.radius**2)/(region.massShell * G**2 * region.massTotal**2))))/np.sqrt(6)
-
-    # return criticalRadius
 
 # %%
 # Define a function to return the ODE result
@@ -306,135 +325,183 @@ def solveODE(model, region, verbose = True):
 
     return ODESolve
 
-# %%
-# Fill out current model and region
+
+# Define  basic models
 ###############################################################################
-model = fiducial
-region = testRegion
+# Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
+fiducial = model("fiducial")
+fiducialOnlyAdvection = model("Only advection", energyInjection=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
+fiducialNoDiffusion = model("No diffusion", diffusionPressure=False)
+fiducialOnlyInput = model("Only energy injection", advectionPressure=False, diffusionPressure=False, pionPressure=False, streamPressure=False)
+fiducialNoAdvection = model("No advection", advectionPressure=False)
+###############################################################################
+
+# Define regions.
+###############################################################################
+testRegion = regionData("Test Region", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
 
 
+# %%
+# Fill out current models and regions
+###############################################################################
+
+modelOne = model("lambda CR: 0.01 pc, R0: 10 pc")
+modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
+modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
+modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
+
+regionOne = regionData(r"MShell: $10^4$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
+regionTwo = regionData(r"MShell: $10^5$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+                        radiusOldStars=10**4, massShell=10**5, massNewStars=10**4, massOldStars=0, gasDensity=0)
+regionThree = regionData(r"MShell: $10^3$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+                        radiusOldStars=10**4, massShell=10**3, massNewStars=10**4, massOldStars=0, gasDensity=0)
+
+modelList = [modelOne, modelTwo, modelThree, modelFour]
+regionList = [regionOne, regionTwo, regionThree]
+
+for currentModel in modelList:
+    for currentRegion in regionList:
+        currentResult = results(currentModel, currentRegion)
+        currentResult.plot("radius", "velocity", scale = symlog)
+
+# %%
+# Define quantity functions - Not currently used
+###############################################################################
+
+# def getLGamma(Edot_cr, t_diff, t_pion):
+
+#     L_gamma = Edot_cr/3 * np.minimum(1,t_diff/t_pion)
+
+#     return L_gamma
+
+# def getPCR(Edot_cr, t, V):
+#     P_cr = Edot_cr * t / (3*V)
+#     return P_cr
+
+# Find the critical , not giving the right answer probably a math error.
+# def getCritRadius(region, model):
+
+#     func = lambda R: 3 * region.energyDotWind * model.windToCREnergyFraction / (region.massShell * c * model.meanFreePath) * R**4 * (1 - region.radius**2 / R**2) - G * region.massTotal / region.radius * R**2 * (1 - region.radius / R) - c**2 * model.meanFreePath**2 / 9
+
+#     criticalRadius = fsolve(func, 5*region.radius)
+
+    # criticalRadius = np.sqrt(region.massShell * model.meanFreePath * c * G * region.massTotal/(region.energyDotWind * model.windToCREnergyFraction * region.radius) * (1 + np.sqrt(1 + (4*region.energyDotWind * region.radius**2)/(region.massShell * G**2 * region.massTotal**2))))/np.sqrt(6)
+
+    # return criticalRadius
 
 # Plots
 ###############################################################################
 
-# %%
-# Plot ODE
-#################################################
+# # %%
+# # Plot ODE
+# #################################################
 
-fig, ax = plt.subplots(dpi=200)
+# fig, ax = plt.subplots(dpi=200)
 
-r = (ODESolve.t * u.cm).to(u.pc)
-v = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
-p = ODESolve.y[1] * u.Ba
-t = ODESolve.y[2] * u.yr
+# initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
 
-initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
+# analyticVelocity = np.sqrt(initialForce * 4 * np.pi * r / region.massShell - con.G * (region.massNewStars + region.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
 
-analyticVelocity = np.sqrt(initialForce * 4 * np.pi * r / region.massShell - con.G * (region.massNewStars + region.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
+# plt.plot(r, v, label=r"$v$")
+# plt.plot(r, analyticVelocity, label = r"Analytic velocity")
+# # plt.plot(ODESolve.t/cm_pc, c/10**5 * model.meanFreePath / (3*ODESolve.t), label = r"$v_{\rm crit}$")
 
-plt.plot(r, v, label=r"$v$")
-plt.plot(r, analyticVelocity, label = r"Analytic velocity")
-# plt.plot(ODESolve.t/cm_pc, c/10**5 * model.meanFreePath / (3*ODESolve.t), label = r"$v_{\rm crit}$")
+# plt.xscale('log')
+# # plt.yscale('log')
 
-plt.xscale('log')
-# plt.yscale('log')
+# # plt.ylim(1)
 
-# plt.ylim(1)
+# # plt.text(0.01, 0.9, '{}'.format(str(model)), transform = ax.transAxes)
+# # plt.text(0.7, 0.17, r'$M_{\rm Star}\, 10^4\,M_\odot$', transform=ax.transAxes)
+# # plt.text(0.7, 0.1, r'$M_{\rm shell}\, 10^4\,M_\odot$', transform=ax.transAxes)
+# # plt.text(0.7, 0.03,
+# #          r'$\dot{E}_{\rm CR}\, 2.5\times 10^3\, L_\odot$', transform=ax.transAxes)
 
-# plt.text(0.01, 0.9, '{}'.format(str(model)), transform = ax.transAxes)
-# plt.text(0.7, 0.17, r'$M_{\rm Star}\, 10^4\,M_\odot$', transform=ax.transAxes)
-# plt.text(0.7, 0.1, r'$M_{\rm shell}\, 10^4\,M_\odot$', transform=ax.transAxes)
-# plt.text(0.7, 0.03,
-#          r'$\dot{E}_{\rm CR}\, 2.5\times 10^3\, L_\odot$', transform=ax.transAxes)
+# plt.xlabel(f"Distance ({r.unit})")
+# plt.ylabel(f"Velocity ({v.unit})")
 
-plt.xlabel(f"Distance ({r.unit})")
-plt.ylabel(f"Velocity ({v.unit})")
+# plt.legend()
 
-plt.legend()
-
-# %%
+# # %%
 
 ## Diagnostic plot of the ODEs
 ################################################
 
-fig, ax1 = plt.subplots(dpi = 200)
+# fig, ax1 = plt.subplots(dpi = 200)
 
-r = ODESolve.t * u.cm
-v = ODESolve.y[0] * u.cm / u.s
-p = ODESolve.y[1] * u.Ba
-t = ODESolve.y[2] * u.yr
+# r = ODESolve.t * u.cm
+# v = ODESolve.y[0] * u.cm / u.s
+# p = ODESolve.y[1] * u.Ba
+# t = ODESolve.y[2] * u.yr
 
-dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
+# dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
 
-energyInjection = model.windToCREnergyFraction * \
-            region.energyDotWind / (4 * np.pi * r**3 * v)
+# energyInjection = model.windToCREnergyFraction * \
+##             region.energyDotWind / (4 * np.pi * r**3 * v)
 
-advectionPressure = -4 * p / r
+# advectionPressure = -4 * p / r
 
-diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
+# diffusionPressure = -con.c.cgs * model.meanFreePath * p / (v * r**2)
 
-ax2 = plt.twinx(ax1)
+# ax2 = plt.twinx(ax1)
 
-ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
-ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
-ax2.plot(r.to(u.pc).value, energyInjection.cgs + advectionPressure.cgs + diffusionPressure.cgs, 'k--', label = "all pressures")
-ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
-ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
-ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
+# ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+# ax2.plot(r.to(u.pc).value, dpdr, 'k', label = "dp/dr")
+# ax2.plot(r.to(u.pc).value, energyInjection.cgs + advectionPressure.cgs + diffusionPressure.cgs, 'k--', label = "all pressures")
+# ax2.plot(r.to(u.pc).value, energyInjection.cgs, 'r--', label = "Energy Injection")
+# ax2.plot(r.to(u.pc).value, advectionPressure.cgs, 'b--', label = "Advection")
+# ax2.plot(r.to(u.pc).value, diffusionPressure.cgs, 'g--', label = "Diffusion")
 
-ax1.set_xscale('log')
-ax1.set_yscale('log')
-ax2.set_yscale('symlog')
+# ax1.set_xscale('log')
+# ax1.set_yscale('log')
+# ax2.set_yscale('symlog')
 
-# ax1.set_ylim(5*10**-12, 2*10**-11)
-ax2.set_ylim(-10**-30, 10**-30)
-
-ax1.set_xlabel(f"Distance ({u.pc})")
-ax1.set_ylabel(f"Pressure ({p.unit})")
-ax2.set_ylabel(f"dP/dr ({diffusionPressure.cgs.unit})")
-
-ax1.legend(loc = 8)
-ax2.legend()
-
-# %%
-
-## Diagnostic plot of the ODEs
-################################################
-
-fig, ax1 = plt.subplots(dpi = 200)
-
-r = ODESolve.t * u.cm
-v = ODESolve.y[0] * u.cm / u.s
-p = ODESolve.y[1] * u.Ba
-t = ODESolve.y[2] * u.yr
-
-initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
-
-analyticPressure =  initialForce / (4*np.pi*r**2)
-
-force = (p * 4 * np.pi * r**2).cgs
-gravity = (con.G * (region.massNewStars + region.massShell) * region.massShell / r**2).cgs
-
-ax2 = plt.twinx(ax1)
-
-ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
-ax1.plot(r.to(u.pc).value, analyticPressure.cgs.value, label = "Analytic pressure")
-ax2.plot(r.to(u.pc).value, force.value, 'k', label = r"p4$\pi r^2$")
-ax2.plot(r.to(u.pc).value, gravity.value, 'r', label = "Gravity")
-
-ax1.set_xscale('log')
-ax1.set_yscale('log')
-ax2.set_yscale('log')
-
-# ax1.set_ylim(5*10**-12, 2*10**-11)
+# # ax1.set_ylim(5*10**-12, 2*10**-11)
 # ax2.set_ylim(-10**-30, 10**-30)
 
-ax1.set_xlabel(f"Distance ({u.pc})")
-ax1.set_ylabel(f"Pressure ({p.unit})")
-ax2.set_ylabel(f"Force ({force.cgs.unit})")
+# ax1.set_xlabel(f"Distance ({u.pc})")
+# ax1.set_ylabel(f"Pressure ({p.unit})")
+# ax2.set_ylabel(f"dP/dr ({diffusionPressure.cgs.unit})")
 
-ax1.legend(loc = 8)
-ax2.legend()
+# ax1.legend(loc = 8)
+# ax2.legend()
 
+# # %%
+# fig, ax1 = plt.subplots(dpi = 200)
+
+# r = ODESolve.t * u.cm
+# v = ODESolve.y[0] * u.cm / u.s
+# p = ODESolve.y[1] * u.Ba
+# t = ODESolve.y[2] * u.yr
+
+# initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
+
+# analyticPressure =  initialForce / (4*np.pi*r**2)
+
+# force = (p * 4 * np.pi * r**2).cgs
+# gravity = (con.G * (region.massNewStars + region.massShell) * region.massShell / r**2).cgs
+
+# ax2 = plt.twinx(ax1)
+
+# ax1.plot(r.to(u.pc).value, p.value, label = "Pressure")
+# ax1.plot(r.to(u.pc).value, analyticPressure.cgs.value, label = "Analytic pressure")
+# ax2.plot(r.to(u.pc).value, force.value, 'k', label = r"p4$\pi r^2$")
+# ax2.plot(r.to(u.pc).value, gravity.value, 'r', label = "Gravity")
+
+# ax1.set_xscale('log')
+# ax1.set_yscale('log')
+# ax2.set_yscale('log')
+
+# # ax1.set_ylim(5*10**-12, 2*10**-11)
+# # ax2.set_ylim(-10**-30, 10**-30)
+
+# ax1.set_xlabel(f"Distance ({u.pc})")
+# ax1.set_ylabel(f"Pressure ({p.unit})")
+# ax2.set_ylabel(f"Force ({force.cgs.unit})")
+
+# ax1.legend(loc = 8)
+# ax2.legend()
 
 # %%
