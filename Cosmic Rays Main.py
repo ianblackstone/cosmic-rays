@@ -1,6 +1,7 @@
 # %%
 from matplotlib import pyplot as plt
 import numpy as np
+import pickle
 from scipy import integrate as inte
 from scipy.optimize import fsolve
 # from hoki import load
@@ -20,6 +21,16 @@ coverageFractionFiducial = 1  # Fraction
 vInitialFiducial = 10 # km/s
 tInitialFiducial = 0 # yr
 eddRatioFiducial = 1
+
+ageFiducial = 1 # Myr
+luminosityFiducial = 10**8 # LSun
+energyDotWindFiducial = 2500 # LSun
+radiusFiducial = 10 # pc
+radiusOldStarsFiducial = 10**4 # pc
+massShellFiducial = 10**4 # MSun
+massNewStarsFiducial = 10**4 # MSun
+massOldStarsFiducial = 0 # MSun
+gasDensityFiducial = 0 # MSun/pc^2
 
 # Turn on or off various pressures in the model.
 energyInjectionFiducial = True
@@ -48,9 +59,20 @@ sweepUpMassFiducial = False
 
 class model:
     # All units read from a model are cgs unless specified. Inputs are in more convenient units.
-    def __init__(self, name, meanFreePath=meanFreePathFiducial, gasColumnHeight=gasColumnHeightFiducial, windToCREnergyFraction=windToCREnergyFractionFiducial, vInitial = vInitialFiducial, tInitial = tInitialFiducial,
-                 coverageFraction=coverageFractionFiducial, eddRatio = eddRatioFiducial, energyInjection=energyInjectionFiducial, advectionPressure=advectionPressureFiducial,
-                 diffusionPressure=diffusionPressureFiducial, pionPressure=pionPressureFiducial, streamPressure=streamPressureFiducial, sweepUpMass=sweepUpMassFiducial):
+    def __init__(self, name,
+                meanFreePath = meanFreePathFiducial,
+                gasColumnHeight = gasColumnHeightFiducial,
+                windToCREnergyFraction = windToCREnergyFractionFiducial,
+                vInitial = vInitialFiducial,
+                tInitial = tInitialFiducial,
+                coverageFraction = coverageFractionFiducial,
+                eddRatio = eddRatioFiducial,
+                energyInjection = energyInjectionFiducial,
+                advectionPressure = advectionPressureFiducial,
+                diffusionPressure = diffusionPressureFiducial,
+                pionPressure = pionPressureFiducial,
+                streamPressure = streamPressureFiducial,
+                sweepUpMass = sweepUpMassFiducial):
         """A model object contains the base data and parameters not related to region data for calculations.
 
         Args:
@@ -87,23 +109,31 @@ class model:
     def __str__(self):
         return f"Model: {self.name}"
 
-
-class regionData:
+class region:
     # All units are cgs unless specified
-    def __init__(self, name, age, luminosity, energyDotWind, radius, radiusOldStars, massShell, massNewStars, massOldStars, gasDensity):
+    def __init__(self, name,
+            age = ageFiducial,
+            luminosity = luminosityFiducial,
+            energyDotWind = energyDotWindFiducial,
+            radius = radiusFiducial,
+            radiusOldStars = radiusOldStarsFiducial,
+            massShell = massShellFiducial,
+            massNewStars = massNewStarsFiducial,
+            massOldStars = massOldStarsFiducial,
+            gasDensity = gasDensityFiducial):
         """_summary_
 
         Args:
             name (String): The region name or reference.
-            age (Float): Region age. Input in Myr, unit will be assigned to it.
-            luminosity (Float): Stellar luminosity of the region. Input in solar luminosities, unit will be assigned to it.
-            energyDotWind (Float): The energy input to the region from stellar wind. Input in solar luminosities, unit will be assigned to it.
-            radius (Float): The radius of the region. Input in pc, unit will be assigned to it. Currently not used in favor of the model's gasColumnHeight.
-            radiusOldStars (Float): The radius of the old stellar population. Input in pc, unit will be assigned to it.
-            massShell (Float): The mass of the gas shell. Input in solar masses, unit will be assigned to it.
-            massNewStars (Float): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it.
-            massOldStars (Float): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total.
-            gasDensity (Float): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in ____. Not currently used.
+            age (Float , optional): Region age. Input in Myr, unit will be assigned to it. Defaults to ageFiducial
+            luminosity (Float , optional): Stellar luminosity of the region. Input in solar luminosities, unit will be assigned to it. Defaults to luminosityFiducial
+            energyDotWind (Float , optional): The energy input to the region from stellar wind. Input in solar luminosities, unit will be assigned to it. Defaults to energyDotWindFiducial
+            radius (Float , optional): The radius of the region. Input in pc, unit will be assigned to it. Currently not used in favor of the model's gasColumnHeight. Defaults to radiusFiducial
+            radiusOldStars (Float , optional): The radius of the old stellar population. Input in pc, unit will be assigned to it. Defaults to radiusOldStarsFiducial
+            massShell (Float , optional): The mass of the gas shell. Input in solar masses, unit will be assigned to it. Defaults to massShellFiducial
+            massNewStars (Float , optional): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it. Defaults to massNewStarsFiducial
+            massOldStars (Float , optional): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total. Defaults to massOldStarsFiducial
+            gasDensity (Float , optional): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in ____. Not currently used. Defaults to gasDensityFiducial
 
         Additional parameters (automatically calculated):
             massTotal (Float): The total region mass in grams.
@@ -138,11 +168,11 @@ class results:
          Args:
             model (model): A model object
             region (region): A region object
+            file (string): A filename to read from
         """
         if file is None:
-            # if model or region is None:
-            #     raise Exception("Results must either have models and regions, or a filepath")
-
+            if model is None or region is None:
+                raise Exception("Results must either have models and regions, or a filepath")
             self.name = model.name + " " + region.name
             self.model = model
             self.region = region
@@ -173,11 +203,13 @@ class results:
         self.pressure = ODESolve.y[1] * u.Ba
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
 
-    def save():
-        pass
+    def save(self):
+        with open(self.name + ".result", 'ab') as file:
+            pickle.dump(self.__dict__, file)
 
-    def load(self, file):
-        pass
+    def load(self, fileName):
+        with open(fileName, 'rb') as file:
+            self.__dict__ = pickle.load(file)
 
     def plot(self, x, y, *z, scale = None):
         """_summary_
@@ -230,10 +262,6 @@ class results:
                 plt.xscale(scale)
                 plt.yscale(scale)
 
-        # for arg in z:
-        #     plt.plot(getattr(self, x), getattr(self, arg), label = arg)
-        # if len(z) > 0:
-        #     plt.legend()
 
 # %%
 # Define timescale functions
@@ -338,8 +366,7 @@ fiducialNoAdvection = model("No advection", advectionPressure=False)
 
 # Define regions.
 ###############################################################################
-testRegion = regionData("Test Region", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
-                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
+testRegion = region("Test Region")
 
 
 # %%
@@ -351,11 +378,11 @@ modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
 modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
 modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
 
-regionOne = regionData(r"MShell: $10^4$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+regionOne = region(r"MShell: $10^4$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
                         radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
-regionTwo = regionData(r"MShell: $10^5$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+regionTwo = region(r"MShell: $10^5$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
                         radiusOldStars=10**4, massShell=10**5, massNewStars=10**4, massOldStars=0, gasDensity=0)
-regionThree = regionData(r"MShell: $10^3$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
+regionThree = region(r"MShell: $10^3$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
                         radiusOldStars=10**4, massShell=10**3, massNewStars=10**4, massOldStars=0, gasDensity=0)
 
 modelList = [modelOne, modelTwo, modelThree, modelFour]
@@ -364,10 +391,10 @@ regionList = [regionOne, regionTwo, regionThree]
 for currentModel in modelList:
     for currentRegion in regionList:
         currentResult = results(currentModel, currentRegion)
-        currentResult.plot("radius", "velocity", scale = symlog)
+        currentResult.plot("radius", "velocity", scale = "symlog")
 
-# %%
-# Define quantity functions - Not currently used
+## %%
+## Define quantity functions - Not currently used
 ###############################################################################
 
 # def getLGamma(Edot_cr, t_diff, t_pion):
