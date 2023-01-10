@@ -24,11 +24,11 @@ eddRatioFiducial = 1
 
 ageFiducial = 1 # Myr
 luminosityFiducial = 10**8 # LSun
-energyDotWindFiducial = 2500 # LSun
 radiusFiducial = 10 # pc
 radiusOldStarsFiducial = 10**4 # pc
 massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
+energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 0 # MSun
 gasDensityFiducial = 0 # MSun/pc^2
 
@@ -203,6 +203,8 @@ class results:
         self.pressure = ODESolve.y[1] * u.Ba
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
 
+        self.dvdr, self.dpdr, self.dtdr = getDVDR(r.value, [v.value, p.value, t.value], self.region, self.model)
+
     def save(self):
         with open(self.name + ".result", 'ab') as file:
             pickle.dump(self.__dict__, file)
@@ -341,9 +343,9 @@ def solveODE(model, region, verbose = True):
     Returns:
         _type_: _description_
     """
-    X0 = [model.vInitial.value, model.eddRatio* 2 * region.eddPressure.value, model.tInitial.value]
+    X0 = [model.vInitial.value, model.eddRatio * 2 * region.eddPressure.value, model.tInitial.value]
 
-    rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
+    rSpan = [0.1*model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
 
     if verbose:
         print("Calculating ODE for " + str(model) + " " + str(region))
@@ -378,12 +380,9 @@ modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
 modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
 modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
-                        radiusOldStars=10**4, massShell=10**4, massNewStars=10**4, massOldStars=0, gasDensity=0)
-regionTwo = region(r"MShell: $10^5$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
-                        radiusOldStars=10**4, massShell=10**5, massNewStars=10**4, massOldStars=0, gasDensity=0)
-regionThree = region(r"MShell: $10^3$ $M_\odot$", age=1, luminosity=10**8, energyDotWind=2500, radius=10,
-                        radiusOldStars=10**4, massShell=10**3, massNewStars=10**4, massOldStars=0, gasDensity=0)
+regionOne = region(r"MShell: $10^4$ $M_\odot$")
+regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
+regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
