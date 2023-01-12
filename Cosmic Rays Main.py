@@ -20,7 +20,7 @@ windToCREnergyFractionFiducial = 0.1  # Fraction
 coverageFractionFiducial = 1  # Fraction
 vInitialFiducial = 10 # km/s
 tInitialFiducial = 0 # yr
-eddRatioFiducial = 1
+eddRatioFiducial = 2 # We assume that all regions are 2x Eddington by default
 
 ageFiducial = 1 # Myr
 luminosityFiducial = 10**8 # LSun
@@ -206,30 +206,27 @@ class results:
         self.dvdr, self.dpdr, self.dtdr = getDVDR(r.value, [v.value, p.value, t.value], self.region, self.model)
 
     def save(self):
-        with open(self.name + ".result", 'ab') as file:
+        with open("Results/" + self.name, 'ab') as file:
             pickle.dump(self.__dict__, file)
 
     def load(self, fileName):
-        with open(fileName, 'rb') as file:
+        with open("Results/" + fileName, 'rb') as file:
             self.__dict__ = pickle.load(file)
 
     def plot(self, x, y, *z, scale = None):
         """_summary_
 
         Args:
-            x (string): _description_
-            y (string): _description_
-            z (string): 
-            scale (_type_, optional): _description_. Defaults to None.
+            x (string): A string giving the attribute to use as the x axis.
+            y (string): A string giving the attribute to use as the y axis.
+            z (string, optional): A string giving additional attributes to plot on a new axis.
+            scale (string, optional): The scale to use for both axes. "log" or "symlog" preferred. Defaults to None.
         """
-        multiplot = len(z) != 0
 
         X = getattr(self, x)
         Y = getattr(self, y)
 
-        if multiplot:
-            
-
+        if len(z) != 0:
             fig, ax1 = plt.subplots(dpi = 200)
             ax2 = plt.twinx(ax1)
 
@@ -255,7 +252,7 @@ class results:
         else:
             plt.figure(dpi = 200)
             plt.title(self.name)
-            plt.plot(getattr(self, x), getattr(self, y), label = y)
+            plt.plot(X.value, Y.value, label = y)
 
             plt.xlabel(f"{x} ({getattr(self, x).unit})")
             plt.ylabel(f"{y} ({getattr(self, y).unit})")
@@ -263,7 +260,30 @@ class results:
             if scale != None:
                 plt.xscale(scale)
                 plt.yscale(scale)
+        
+    def multiPlot(self, x, y, result, scale = None):
+        """Plots the data from multiple results objects
 
+        Args:
+            x (string): A string giving the attribute to use as the x axis.
+            y (string): A string giving the attribute to use as the y axis.
+            y2 (array): An array containing any number of other results objects to also plot the same y attributes from.
+            scale (string, optional): The scale to use for both axes. "log" or "symlog" preferred. Defaults to None.
+        """
+        plt.figure(dpi = 200)
+        plt.title(y + " vs. " + x)
+
+        plt.plot(getattr(self, x), getattr(self, y), label = self.name)
+        for res in result:
+            plt.plot(getattr(res, x), getattr(res, y), label = res.name)
+        
+        plt.legend(bbox_to_anchor=(1, 1))
+        if scale != None:
+            plt.xscale(scale)
+            plt.yscale(scale)
+
+        plt.xlabel(f"{x} ({getattr(self, x).unit})")
+        plt.ylabel(f"{y} ({getattr(self, y).unit})")
 
 # %%
 # Define timescale functions
@@ -327,7 +347,7 @@ def getDVDR(rShell, X, region, model):
 
     dtdr = 1/abs(vShell)
 
-    return dvdr, dpdr, dtdr
+    return [dvdr, dpdr, dtdr]
 
 
 # %%
@@ -343,9 +363,9 @@ def solveODE(model, region, verbose = True):
     Returns:
         _type_: _description_
     """
-    X0 = [model.vInitial.value, model.eddRatio * 2 * region.eddPressure.value, model.tInitial.value]
+    X0 = [model.vInitial.value, model.eddRatio * region.eddPressure.value, model.tInitial.value]
 
-    rSpan = [0.1*model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
+    rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
 
     if verbose:
         print("Calculating ODE for " + str(model) + " " + str(region))
@@ -387,10 +407,23 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
+resultList = []
+
 for currentModel in modelList:
     for currentRegion in regionList:
         currentResult = results(currentModel, currentRegion)
-        currentResult.plot("radius", "velocity", scale = "symlog")
+        if False: #any(currentResult.velocity < 0):
+            continue
+        else:
+            resultList.append(currentResult)
+
+resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
+
+# # %%
+# # Plot results
+# for res in resultList:
+#     res.plot("radius", "velocity", scale = "symlog")
+
 
 ## %%
 ## Define quantity functions - Not currently used
