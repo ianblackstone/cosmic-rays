@@ -18,13 +18,13 @@ meanFreePathFiducial = 0.01  # pc
 gasColumnHeightFiducial = 10  # pc
 windToCREnergyFractionFiducial = 0.1  # Fraction
 coverageFractionFiducial = 1  # Fraction
-vInitialFiducial = 10 # km/s
+vInitialFiducial = 1 # km/s
 tInitialFiducial = 0 # yr
 eddRatioFiducial = 2 # We assume that all regions are 2x Eddington by default
 
 ageFiducial = 1 # Myr
 luminosityFiducial = 10**8 # LSun
-radiusFiducial = 10 # pc
+radiusFiducial = 100 # pc
 radiusOldStarsFiducial = 10**4 # pc
 massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
@@ -142,7 +142,7 @@ class region:
             eddPressure (Float): The Eddington pressure for the initial region conditions, in Bayres.
         """
         self.name = name
-        self.age = age
+        self.age = (age * u.Myr).cgs
         self.luminosity = (luminosity * u.solLum).cgs
         self.energyDotWind = (energyDotWind * u.solLum).cgs
         self.radius = (radius * u.pc).cgs
@@ -180,9 +180,6 @@ class results:
             self.calculate()
         else:
             self.load(file)
-    
-    def __getItem__(self, key):
-        return self.item[key]
 
     def calculate(self):
         """Calculates the results for a given model and region
@@ -193,17 +190,12 @@ class results:
         """
         ODESolve = solveODE(self.model, self.region)
 
-        r = (ODESolve.t * u.cm).to(u.pc)
-        v = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
-        p = ODESolve.y[1] * u.Ba
-        t = ODESolve.y[2] * u.yr
-
         self.radius = (ODESolve.t * u.cm).to(u.pc)
         self.velocity = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
         self.pressure = ODESolve.y[1] * u.Ba
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
 
-        self.dvdr, self.dpdr, self.dtdr = getDVDR(r.value, [v.value, p.value, t.value], self.region, self.model)
+        self.dvdt, self.dpdt, _ = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value], self.region, self.model)
 
     def save(self):
         with open("Results/" + self.name, 'ab') as file:
@@ -250,7 +242,7 @@ class results:
             ax2.legend()
 
         else:
-            plt.figure(dpi = 200)
+            plt.figure(dpi = 200, facecolor = "white")
             plt.title(self.name)
             plt.plot(X.value, Y.value, label = y)
 
@@ -262,6 +254,7 @@ class results:
                 plt.yscale(scale)
         
     def multiPlot(self, x, y, result, scale = None):
+
         """Plots the data from multiple results objects
 
         Args:
@@ -270,7 +263,7 @@ class results:
             y2 (array): An array containing any number of other results objects to also plot the same y attributes from.
             scale (string, optional): The scale to use for both axes. "log" or "symlog" preferred. Defaults to None.
         """
-        plt.figure(dpi = 200)
+        plt.figure(dpi = 200, facecolor = "white")
         plt.title(y + " vs. " + x)
 
         plt.plot(getattr(self, x), getattr(self, y), label = self.name)
@@ -284,6 +277,30 @@ class results:
 
         plt.xlabel(f"{x} ({getattr(self, x).unit})")
         plt.ylabel(f"{y} ({getattr(self, y).unit})")
+
+    def verify(self):
+        """
+        Calculates the analytic solution v = sqrt( F0 * 4pi * r / Msh - GMtot / r + C) where C is the integration constant, solved for by solving for v0.
+
+        To do: This analytic solution is for diffusion dominated systems only.
+        """
+        initialForce = (self.model.eddRatio *  self.region.eddPressure * 4 * np.pi * self.model.gasColumnHeight**2).cgs
+
+        constantOffset = np.power(self.model.vInitial,2).cgs - (initialForce * 4 * np.pi * self.model.gasColumnHeight / self.region.massShell).cgs + (con.G * (self.region.massNewStars + self.region.massShell)/self.model.gasColumnHeight).cgs
+
+        self.analyticVelocity = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + constantOffset).to(u.km/u.s)
+
+        plt.figure(dpi = 200, facecolor = "white")
+        plt.plot(self.radius, self.velocity, label = "velocity (ODE)")
+        plt.plot(self.radius, self.analyticVelocity, label = "velocity (analytic)")
+
+        plt.legend()
+
+        plt.xscale('log')
+        plt.yscale('log')
+
+        plt.xlabel(f"Radius ({self.radius.unit})")
+        plt.ylabel(f"Velocity ({self.velocity.unit})")
 
 # %%
 # Define timescale functions
@@ -304,7 +321,6 @@ def getMinimumTime(rShell, vShell, model):
     pionTime = np.inf  # Not currently accounted for
 
     return min(tDiff, tAdv, pionTime)
-
 
 def getDVDR(rShell, X, region, model):
     """Set of coupled ODEs giving dv/dr, dp/dr, and dt/dr
@@ -349,32 +365,61 @@ def getDVDR(rShell, X, region, model):
 
     return [dvdr, dpdr, dtdr]
 
+def getDVDT(t, X, region, model):
+    """Set of coupled ODEs giving dv/dt, dp/dt, and dr/dt
 
-# %%
-# Define a function to return the ODE result
+    Args:
+        t (number): The time in seconds
+        X (array): An array with the current value of [vShell, pCR, rShell].
+        region (region): The current region
+        model (model): The current model
+
+    Returns:
+        array of numbers: Returns [dv/dt, dp/dt, dr/dt]
+    """
+    vShell, pCR, rShell = X
+
+    dpdt = 0
+
+    if model.energyInjection:
+        dpdt += model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3)
+
+    if model.advectionPressure:
+        dpdt -= 4 * pCR * vShell / rShell
+
+    if model.diffusionPressure:
+        dpdt -= con.c.cgs.value * model.meanFreePath.value * pCR /rShell**2
+
+    if model.streamPressure:
+        dpdt -= 0  # To-Do
+
+    dvdt = pCR * 4 * np.pi * rShell**2/region.massShell.value - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/rShell**2
+
+    drdt = vShell
+
+    return [dvdt, dpdt, drdt]
+
 def solveODE(model, region, verbose = True):
     """Returns the ODEs for a given model and region
 
     Args:
-        model (_type_): A model object
-        region (_type_): a region object.
+        model (model): A model object
+        region (region): a region object.
         verbose (bool, optional): Whether to be verbose during run. Defaults to True.
 
     Returns:
-        _type_: _description_
+        ODESolve: A solve_ivp object.
     """
-    X0 = [model.vInitial.value, model.eddRatio * region.eddPressure.value, model.tInitial.value]
+    X0 = [model.vInitial.value, model.eddRatio * region.eddPressure.value, region.age.value]
 
-    rSpan = [model.gasColumnHeight.value, 1000*model.gasColumnHeight.value]
+    rSpan = (model.gasColumnHeight.value, 1000*model.gasColumnHeight.value)
 
     if verbose:
         print("Calculating ODE for " + str(model) + " " + str(region))
 
-    ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, args=[
-                            region, model], max_step=(1 * u.pc).cgs.value, rtol=1)
+    ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, method = "Radau", args=[region, model], max_step=(1 * u.pc).cgs.value, rtol = 10e-6, atol = 10e-9)
 
     return ODESolve
-
 
 # Define  basic models
 ###############################################################################
@@ -407,48 +452,26 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
+# modelList = [modelOne]
+# regionList = [regionOne]
+
 resultList = []
 
 for currentModel in modelList:
     for currentRegion in regionList:
         currentResult = results(currentModel, currentRegion)
-        if False: #any(currentResult.velocity < 0):
-            continue
-        else:
-            resultList.append(currentResult)
+        resultList.append(currentResult)
 
-resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
+resultList[0].multiPlot("radius", "velocity", resultList[4:-1], scale = "symlog")
+
+for res in resultList:
+    res.verify()
 
 # # %%
 # # Plot results
 # for res in resultList:
 #     res.plot("radius", "velocity", scale = "symlog")
 
-
-## %%
-## Define quantity functions - Not currently used
-###############################################################################
-
-# def getLGamma(Edot_cr, t_diff, t_pion):
-
-#     L_gamma = Edot_cr/3 * np.minimum(1,t_diff/t_pion)
-
-#     return L_gamma
-
-# def getPCR(Edot_cr, t, V):
-#     P_cr = Edot_cr * t / (3*V)
-#     return P_cr
-
-# Find the critical , not giving the right answer probably a math error.
-# def getCritRadius(region, model):
-
-#     func = lambda R: 3 * region.energyDotWind * model.windToCREnergyFraction / (region.massShell * c * model.meanFreePath) * R**4 * (1 - region.radius**2 / R**2) - G * region.massTotal / region.radius * R**2 * (1 - region.radius / R) - c**2 * model.meanFreePath**2 / 9
-
-#     criticalRadius = fsolve(func, 5*region.radius)
-
-    # criticalRadius = np.sqrt(region.massShell * model.meanFreePath * c * G * region.massTotal/(region.energyDotWind * model.windToCREnergyFraction * region.radius) * (1 + np.sqrt(1 + (4*region.energyDotWind * region.radius**2)/(region.massShell * G**2 * region.massTotal**2))))/np.sqrt(6)
-
-    # return criticalRadius
 
 # Plots
 ###############################################################################
@@ -459,9 +482,9 @@ resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog"
 
 # fig, ax = plt.subplots(dpi=200)
 
-# initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
+# initialForce = (testRegion.eddPressure * 4 * np.pi * testRegion.radius**2).to(u.N)
 
-# analyticVelocity = np.sqrt(initialForce * 4 * np.pi * r / region.massShell - con.G * (region.massNewStars + region.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
+# analyticVelocity = np.sqrt(initialForce * 4 * np.pi * r / testRegion.massShell - con.G * (testRegion.massNewStars + testRegion.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
 
 # plt.plot(r, v, label=r"$v$")
 # plt.plot(r, analyticVelocity, label = r"Analytic velocity")
