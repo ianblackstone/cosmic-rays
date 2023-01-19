@@ -7,6 +7,7 @@ from scipy.optimize import fsolve
 # from hoki import load
 from astropy import constants as con
 from astropy import units as u
+from matplotlib.collections import LineCollection
 
 # Pion lifetime in years
 pion_lifetime = 5*10**7 * u.yr
@@ -29,7 +30,7 @@ radiusOldStarsFiducial = 10**4 # pc
 massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
-massOldStarsFiducial = 0 # MSun
+massOldStarsFiducial = 10**4 # MSun
 gasDensityFiducial = 0 # MSun/pc^2
 
 # Turn on or off various pressures in the model.
@@ -278,14 +279,6 @@ class results:
         plt.xlabel(f"{x} ({getattr(self, x).unit})")
         plt.ylabel(f"{y} ({getattr(self, y).unit})")
 
-    def fun(self, v, r, integrationConstant):
-        A = self.region.energyDotWind * self.model.windToCREnergyFraction / (4 * np.pi * self.region.massShell)
-        B = con.G * (self.region.massShell + self.region.massNewStars)
-
-        res = 2 * A**2 * np.log(A - B * v) + B * v * (2*A + B*v) + integrationConstant - 2*B**3/r
-
-        return res
-
     def verify(self):
         """
         Calculates the analytic solution v = sqrt( F0 * 4pi * r / Msh - GMtot / r + C) where C is the integration constant, solved for by solving for v0.
@@ -298,14 +291,10 @@ class results:
 
         self.analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
 
-        self.integrationConstantAdvection = -(2 * self.region.energyDotWind * self.model.windToCREnergyFraction / (4 * np.pi * self.region.massShell)**2 * np.log(self.region.energyDotWind * self.model.windToCREnergyFraction / (4 * np.pi * self.region.massShell) - con.G * (self.region.massShell + self.region.massNewStars) * self.model.vInitial) + con.G * (self.region.massShell + self.region.massNewStars) * self.model.vInitial * (2*self.region.energyDotWind * self.model.windToCREnergyFraction / (4 * np.pi * self.region.massShell) + con.G * (self.region.massShell + self.region.massNewStars)*self.model.vInitial) - 2*con.G * (self.region.massShell + self.region.massNewStars)**3/self.model.gasColumnHeight)
-
-        self.analyticVelocityAdvection = fsolve(self.fun, self.model.vInitial, [self.radius, self.integrationConstantAdvection])
-
         plt.figure(dpi = 200, facecolor = "white")
         plt.plot(self.radius, self.velocity, label = "velocity (ODE)")
         plt.plot(self.radius, self.analyticVelocityDiffusion, label = "velocity (analytic, Diffusion)")
-        plt.plot(self.radius, self.analyticVelocityAdvection, laebl = "velocity (analytic Advection)")
+        plt.title(self.name)
 
         plt.legend()
 
@@ -364,15 +353,13 @@ def getDVDR(rShell, X, region, model):
     if model.streamPressure:
         dpdr -= 0  # To-Do
 
-    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - \
-        con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
+    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
 
     # Old dvdr that uses P ~ Edot * t
     # dvdr =  model.windToCREnergyFraction*region.energyDotWind*model.coverageFraction / rShell /(region.massShell*vShell) * getMinimumTime(rShell, vShell, model.meanFreePath, region.pionTime) - G*(region.massShell + region.massNewStars)/(vShell*rShell**2)
 
     if model.sweepUpMass:
-        dvdr -= vShell*4*np.pi*region.gasDensity.value * \
-            (rShell - model.gasColumnHeight.value)**2 / region.massShell.value
+        dvdr -= vShell*4*np.pi*region.gasDensity.value * (rShell - model.gasColumnHeight.value)**2 / region.massShell.value
 
     dtdr = 1/abs(vShell)
 
@@ -465,8 +452,8 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
-modelList = [modelOne]
-regionList = [regionOne]
+# modelList = [modelOne]
+# regionList = [regionOne]
 
 resultList = []
 
@@ -475,10 +462,23 @@ for currentModel in modelList:
         currentResult = results(currentModel, currentRegion)
         resultList.append(currentResult)
 
-resultList[0].multiPlot("radius", "velocity", resultList[4:-1], scale = "symlog")
+resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
+resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
 
 for res in resultList:
     res.verify()
+
+
+# %%
+# Plot with dominant time scale
+###############################################################################
+
+plt.figure(dpi = 200, facecolor = "White")
+fig, ax = plt.subplots()
+
+segments = np.concatenate()
+
+lc = LineCollection()
 
 # # %%
 # # Plot results
