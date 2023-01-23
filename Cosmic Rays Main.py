@@ -9,6 +9,7 @@ from astropy import constants as con
 from astropy import units as u
 from matplotlib.collections import LineCollection
 
+
 # Pion lifetime in years
 pion_lifetime = 5*10**7 * u.yr
 
@@ -291,18 +292,40 @@ class results:
 
         self.analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
 
-        plt.figure(dpi = 200, facecolor = "white")
-        plt.plot(self.radius, self.velocity, label = "velocity (ODE)")
-        plt.plot(self.radius, self.analyticVelocityDiffusion, label = "velocity (analytic, Diffusion)")
-        plt.title(self.name)
+        tDiff = 3*self.radius.cgs**2 / (con.c * self.model.meanFreePath).cgs
+        tAdv = self.radius.cgs/self.velocity.cgs
 
-        plt.legend()
+        ratio = tDiff / tAdv
 
-        plt.xscale('log')
-        plt.yscale('log')
+        tDiffDominant = ratio < 0.6
+        tAdvDominant = ratio > 0.4
 
-        plt.xlabel(f"Radius ({self.radius.unit})")
-        plt.ylabel(f"Velocity ({self.velocity.unit})")
+        ratio[tDiffDominant] = 1
+        ratio[tAdvDominant] = 0
+
+        points = np.array([self.radius.value, self.velocity.value]).T.reshape(-1, 1, 2)
+
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+        norm = plt.Normalize(0, 1)
+
+        lc = LineCollection(segments, array = ratio, cmap = "viridis", linewidths=2, norm = norm)
+
+        fig, ax = plt.subplots(dpi = 200)
+        line = ax.add_collection(lc)
+        ax.plot(self.radius, self.analyticVelocityDiffusion, label = "velocity (analytic, Diffusion)")
+        # fig.colorbar(line, ax=ax)
+        
+        ax.set_title(self.name)
+
+        ax.legend()
+
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+
+        ax.set_xlabel(f"Radius ({self.radius.unit})")
+        ax.set_ylabel(f"Velocity ({self.velocity.unit})")
+
 
 # %%
 # Define timescale functions
@@ -452,8 +475,8 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
-# modelList = [modelOne]
-# regionList = [regionOne]
+# modelList = [modelThree]
+# regionList = [regionTwo]
 
 resultList = []
 
@@ -468,17 +491,6 @@ resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
 for res in resultList:
     res.verify()
 
-
-# %%
-# Plot with dominant time scale
-###############################################################################
-
-plt.figure(dpi = 200, facecolor = "White")
-fig, ax = plt.subplots()
-
-segments = np.concatenate()
-
-lc = LineCollection()
 
 # # %%
 # # Plot results
