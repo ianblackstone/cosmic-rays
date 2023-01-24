@@ -197,7 +197,7 @@ class results:
         self.pressure = ODESolve.y[1] * u.Ba
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
 
-        self.dvdt, self.dpdt, _ = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value], self.region, self.model)
+        self.dvdr, self.dpdr, _ = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value], self.region, self.model)
 
     def save(self):
         with open("Results/" + self.name, 'ab') as file:
@@ -292,39 +292,28 @@ class results:
 
         self.analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
 
-        tDiff = 3*self.radius.cgs**2 / (con.c * self.model.meanFreePath).cgs
-        tAdv = self.radius.cgs/self.velocity.cgs
-
-        ratio = tDiff / tAdv
-
-        tDiffDominant = ratio < 0.6
-        tAdvDominant = ratio > 0.4
-
-        ratio[tDiffDominant] = 1
-        ratio[tAdvDominant] = 0
-
-        points = np.array([self.radius.value, self.velocity.value]).T.reshape(-1, 1, 2)
-
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
-
-        norm = plt.Normalize(0, 1)
-
-        lc = LineCollection(segments, array = ratio, cmap = "viridis", linewidths=2, norm = norm)
+        tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).to(u.yr)
+        tAdv = (self.radius/self.velocity).to(u.yr)
 
         fig, ax = plt.subplots(dpi = 200)
-        line = ax.add_collection(lc)
-        ax.plot(self.radius, self.analyticVelocityDiffusion, label = "velocity (analytic, Diffusion)")
-        # fig.colorbar(line, ax=ax)
+        ax2 = plt.twinx(ax)
+        ax.plot(self.radius, self.analyticVelocityDiffusion, 'k', label = "Velocity (Analytic)")
+        ax.plot(self.radius, self.velocity, 'c', label = "velocity (ODE)")
+        ax2.plot(self.radius, tDiff, 'r--', label = "Diffusion Time")
+        ax2.plot(self.radius, tAdv, 'b--', label = "Advection Time")
         
         ax.set_title(self.name)
 
-        ax.legend()
+        ax.legend(loc = 2)
+        ax2.legend(loc = 4)
 
         ax.set_xscale('log')
         ax.set_yscale('log')
+        ax2.set_yscale('log')
 
         ax.set_xlabel(f"Radius ({self.radius.unit})")
         ax.set_ylabel(f"Velocity ({self.velocity.unit})")
+        ax2.set_ylabel(f"Time ({tDiff.unit})")
 
 
 # %%
@@ -475,8 +464,8 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
-# modelList = [modelThree]
-# regionList = [regionTwo]
+modelList = [modelThree]
+regionList = [regionTwo]
 
 resultList = []
 
