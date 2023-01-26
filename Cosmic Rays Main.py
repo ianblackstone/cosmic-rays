@@ -490,6 +490,47 @@ for res in resultList:
 # Plots
 ###############################################################################
 
+# %%
+# Proposal Plot results
+###################################################
+
+proposalRegion = region("proposal region", massShell = 10**3)
+proposalModelOne = model("lambda 0.01 pc", meanFreePath = 0.01)
+proposalModelTwo = model("lambda 0.03 pc", meanFreePath = 0.03)
+proposalModelThree = model("lambda 0.1 pc", meanFreePath = 0.1)
+
+proposalResultsOne = results(proposalModelOne, proposalRegion)
+proposalResultsTwo = results(proposalModelTwo, proposalRegion)
+proposalResultsThree = results(proposalModelThree, proposalRegion)
+
+# %%
+# Proposal plots
+###################################################
+
+fig, ax = plt.subplots(1,2, dpi = 200, figsize = (10,4), facecolor = "white")
+
+ax[0].plot(proposalResultsOne.time.to(u.Myr), proposalResultsOne.velocity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+ax[0].plot(proposalResultsTwo.time.to(u.Myr), proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+ax[0].plot(proposalResultsThree.time.to(u.Myr), proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+
+ax[1].plot(proposalResultsOne.radius, proposalResultsOne.velocity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+ax[1].plot(proposalResultsTwo.radius, proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+ax[1].plot(proposalResultsThree.radius, proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+
+ax[0].set_xscale('log')
+ax[0].set_yscale('log')
+ax[1].set_xscale('log')
+ax[1].set_yscale('log')
+
+ax[0].set_xlabel('Time (Myr)')
+ax[0].set_ylabel('Velocity (km/s)')
+ax[1].set_xlabel('Radius (pc)')
+
+ax[0].legend()
+
+# %%
+
+
 # # %%
 # # Plot ODE
 # #################################################
