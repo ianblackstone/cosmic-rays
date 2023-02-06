@@ -11,7 +11,7 @@ from matplotlib.collections import LineCollection
 
 
 # Pion lifetime in years
-pion_lifetime = 5*10**7 * u.yr
+pionLifetime = 5*10**7 * u.yr
 
 # %%
 # Set fiducial values
@@ -19,6 +19,7 @@ pion_lifetime = 5*10**7 * u.yr
 meanFreePathFiducial = 0.01  # pc
 gasColumnHeightFiducial = 10  # pc
 windToCREnergyFractionFiducial = 0.1  # Fraction
+vWindFiducial = 500 # km/s
 coverageFractionFiducial = 1  # Fraction
 vInitialFiducial = 1 # km/s
 tInitialFiducial = 0 # yr
@@ -65,6 +66,7 @@ class model:
                 meanFreePath = meanFreePathFiducial,
                 gasColumnHeight = gasColumnHeightFiducial,
                 windToCREnergyFraction = windToCREnergyFractionFiducial,
+                vWind = vWindFiducial,
                 vInitial = vInitialFiducial,
                 tInitial = tInitialFiducial,
                 coverageFraction = coverageFractionFiducial,
@@ -84,6 +86,7 @@ class model:
             vInitial (Float, optional): Initial velocity. Input in km/s, will be converted to cm/s and a unit label added. Defaults to vInitialFiducial.
             tInitial (Float, optional): Initial age of the cluster. Input in yr, will be converted to s and a unit label added. Defaults to tInitialFiducial. Not currently used.
             windToCREnergyFraction (Float, optional): Parameter for what fraction of wind energy is converted to CR energy. Defaults to windToCREnergyFractionFiducial.
+            vWind (number): The velocity of the wind. Input in km/s, will be converted to cgs.
             coverageFraction (Float, optional): Shell coverage fraction. Defaults to coverageFractionFiducial.
             eddRatio (Float, optional): The initial Eddington ratio. Defaults to eddRatioFiducial.
             energyInjection (Boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
@@ -97,6 +100,7 @@ class model:
         self.meanFreePath = (meanFreePath * u.pc).cgs
         self.gasColumnHeight = (gasColumnHeight * u.pc).cgs
         self.windToCREnergyFraction = windToCREnergyFraction
+        self.vWind = (vWind * u.km / u.s).cgs
         self.coverageFraction = coverageFraction
         self.eddRatio = eddRatio
         self.vInitial = (vInitial * u.km / u.s).cgs
@@ -196,6 +200,11 @@ class results:
         self.velocity = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
         self.pressure = ODESolve.y[1] * u.Ba
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
+        self.mDotWind = (2 * self.region.energyDotWind / self.model.vWind**2).cgs
+        self.innerShockGasDensity = (self.mDotWind / (4 * np.pi * self.radius**2 * self.model.vWind)).cgs
+        self.innerShockNumberDensity = self.innerShockGasDensity / con.m_p.cgs
+        self.tPion = pionLifetime / self.innerShockNumberDensity
+        self.gammaLuminosity = 1 / 3 * self.region.energyDotWind * self.model.windToCREnergyFraction / self.tPion
 
         self.dvdr, self.dpdr, _ = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value], self.region, self.model)
 
@@ -468,8 +477,8 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
-modelList = [modelThree]
-regionList = [regionTwo]
+# modelList = [modelThree]
+# regionList = [regionTwo]
 
 resultList = []
 
@@ -550,8 +559,8 @@ plt.plot(proposalResultsOne.radius, diffTerm, label = "Diffusion")
 plt.xscale("log")
 plt.yscale("log")
 
-plt.xlabel("Radius")
-plt.ylabel(f"Pressure {energyInjection.unit}")
+plt.xlabel("Radius (pc)")
+plt.ylabel(f"dP/dr ({energyInjection.unit})")
 
 plt.legend()
 
