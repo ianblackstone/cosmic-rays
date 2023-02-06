@@ -295,10 +295,14 @@ class results:
         tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).to(u.yr)
         tAdv = (self.radius/self.velocity).to(u.yr)
 
+        advVelocity = (np.cbrt((3 * self.model.windToCREnergyFraction * self.region.energyDotWind * self.radius/(4 * self.region.massShell)))).to(u.km/u.s)
+
+
         fig, ax = plt.subplots(dpi = 200)
         ax2 = plt.twinx(ax)
-        ax.plot(self.radius, self.analyticVelocityDiffusion, 'k', label = "Velocity (Analytic)")
-        ax.plot(self.radius, self.velocity, 'c', label = "velocity (ODE)")
+        ax.plot(self.radius, self.analyticVelocityDiffusion.to(u.km/u.s), 'k', label = "Velocity (Analytic)")
+        ax.plot(self.radius, self.velocity.to(u.km/u.s), 'c', label = "velocity (ODE)")
+        ax.plot(self.radius, advVelocity, 'g', label = r"$(\frac{3\dot{E}_{\rm cr}R}{4M_{\rm sh}})^{1/3}$")
         ax2.plot(self.radius, tDiff, 'r--', label = "Diffusion Time")
         ax2.plot(self.radius, tAdv, 'b--', label = "Advection Time")
         
@@ -527,6 +531,30 @@ ax[0].set_ylabel('Velocity (km/s)')
 ax[1].set_xlabel('Radius (pc)')
 
 ax[0].legend()
+
+# %%
+# Plot verification
+
+plt.figure(dpi = 200)
+
+energyInjection = (proposalResultsOne.model.windToCREnergyFraction * proposalResultsOne.region.energyDotWind / (4 * np.pi * proposalResultsOne.radius**3 * proposalResultsOne.velocity)).cgs
+
+diffTerm = (con.c  * proposalResultsOne.model.meanFreePath * proposalResultsOne.pressure / (proposalResultsOne.velocity * proposalResultsOne.radius**2)).cgs
+
+advTerm = (4* proposalResultsOne.pressure / proposalResultsOne.radius).cgs
+
+plt.plot(proposalResultsOne.radius, energyInjection, label = "Energy Injection")
+plt.plot(proposalResultsOne.radius, advTerm, label = "Advection")
+plt.plot(proposalResultsOne.radius, diffTerm, label = "Diffusion")
+
+plt.xscale("log")
+plt.yscale("log")
+
+plt.xlabel("Radius")
+plt.ylabel(f"Pressure {energyInjection.unit}")
+
+plt.legend()
+
 
 # %%
 
