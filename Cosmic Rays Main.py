@@ -10,9 +10,6 @@ from astropy import units as u
 from matplotlib.collections import LineCollection
 
 
-# Pion lifetime in years
-pionLifetime = 5*10**7 * u.yr
-
 # %%
 # Set fiducial values
 ###############################################################################
@@ -24,6 +21,7 @@ coverageFractionFiducial = 1  # Fraction
 vInitialFiducial = 1 # km/s
 tInitialFiducial = 0 # yr
 eddRatioFiducial = 2 # We assume that all regions are 2x Eddington by default
+pionLifetimeFiducial = 5*10**7 # yr
 
 ageFiducial = 1 # Myr
 luminosityFiducial = 10**8 # LSun
@@ -71,6 +69,7 @@ class model:
                 tInitial = tInitialFiducial,
                 coverageFraction = coverageFractionFiducial,
                 eddRatio = eddRatioFiducial,
+                pionLifetime = pionLifetimeFiducial,
                 energyInjection = energyInjectionFiducial,
                 advectionPressure = advectionPressureFiducial,
                 diffusionPressure = diffusionPressureFiducial,
@@ -89,6 +88,7 @@ class model:
             vWind (number): The velocity of the wind. Input in km/s, will be converted to cgs.
             coverageFraction (Float, optional): Shell coverage fraction. Defaults to coverageFractionFiducial.
             eddRatio (Float, optional): The initial Eddington ratio. Defaults to eddRatioFiducial.
+            pionLifetime (Float, optional): The pion lifetime scale. Input in yr, will be converted to s and a unit label added. Defaults to pionLifetimeFiducial
             energyInjection (Boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
             advectionPressure (Boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
             diffusionPressure (Boolean, optional): Boolean to enable diffusion in the model. Defaults to diffusionPressureFiducial.
@@ -103,6 +103,7 @@ class model:
         self.vWind = (vWind * u.km / u.s).cgs
         self.coverageFraction = coverageFraction
         self.eddRatio = eddRatio
+        self.pionLifetime = (pionLifetime * u.yr).cgs
         self.vInitial = (vInitial * u.km / u.s).cgs
         self.tInitial = (tInitial * u.yr).cgs
         self.energyInjection = energyInjection
@@ -161,7 +162,6 @@ class region:
         self.electronDensity = self.massShell / \
             (4/3*np.pi*(self.radius)**3) / \
             con.m_p.cgs
-        self.pionTime = pion_lifetime / self.electronDensity
         self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * np.pi * self.radius**4)).to(u.Ba)
 
     def __str__(self):
@@ -203,8 +203,11 @@ class results:
         self.mDotWind = (2 * self.region.energyDotWind / self.model.vWind**2).cgs
         self.innerShockGasDensity = (self.mDotWind / (4 * np.pi * self.radius**2 * self.model.vWind)).cgs
         self.innerShockNumberDensity = self.innerShockGasDensity / con.m_p.cgs
-        self.tPion = pionLifetime / self.innerShockNumberDensity
-        self.gammaLuminosity = 1 / 3 * self.region.energyDotWind * self.model.windToCREnergyFraction / self.tPion
+        self.tPion = self.model.pionLifetime / self.innerShockNumberDensity / u.cm**3
+        self.tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).cgs
+        self.tAdv = (self.radius/self.velocity).cgs
+        self.energyCR = (self.pressure * 4 * np.pi * self.radius**3).cgs
+        self.gammaLuminosity = (1 / 3 * self.energyCR * self.model.windToCREnergyFraction * self.tDiff / self.tPion).cgs
 
         self.dvdr, self.dpdr, _ = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value], self.region, self.model)
 
@@ -301,9 +304,6 @@ class results:
 
         self.analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
 
-        tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).to(u.yr)
-        tAdv = (self.radius/self.velocity).to(u.yr)
-
         advVelocity = (np.cbrt((3 * self.model.windToCREnergyFraction * self.region.energyDotWind * self.radius/(4 * self.region.massShell)))).to(u.km/u.s)
 
 
@@ -312,8 +312,8 @@ class results:
         ax.plot(self.radius, self.analyticVelocityDiffusion.to(u.km/u.s), 'k', label = "Velocity (Analytic)")
         ax.plot(self.radius, self.velocity.to(u.km/u.s), 'c', label = "velocity (ODE)")
         ax.plot(self.radius, advVelocity, 'g', label = r"$(\frac{3\dot{E}_{\rm cr}R}{4M_{\rm sh}})^{1/3}$")
-        ax2.plot(self.radius, tDiff, 'r--', label = "Diffusion Time")
-        ax2.plot(self.radius, tAdv, 'b--', label = "Advection Time")
+        ax2.plot(self.radius, self.tDiff.to(u.yr), 'r--', label = "Diffusion Time")
+        ax2.plot(self.radius, self.tAdv.to(u.yr), 'b--', label = "Advection Time")
         
         ax.set_title(self.name)
 
@@ -326,7 +326,7 @@ class results:
 
         ax.set_xlabel(f"Radius ({self.radius.unit})")
         ax.set_ylabel(f"Velocity ({self.velocity.unit})")
-        ax2.set_ylabel(f"Time ({tDiff.unit})")
+        ax2.set_ylabel(f"Time ({u.yr})")
 
 
 # %%
@@ -465,33 +465,33 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-modelOne = model("lambda CR: 0.01 pc, R0: 10 pc")
-modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
-modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
-modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
+# modelOne = model("lambda CR: 0.01 pc, R0: 10 pc")
+# modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
+# modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
+# modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$")
-regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
-regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
+# regionOne = region(r"MShell: $10^4$ $M_\odot$")
+# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
+# regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 
-modelList = [modelOne, modelTwo, modelThree, modelFour]
-regionList = [regionOne, regionTwo, regionThree]
+# modelList = [modelOne, modelTwo, modelThree, modelFour]
+# regionList = [regionOne, regionTwo, regionThree]
 
 # modelList = [modelThree]
 # regionList = [regionTwo]
 
-resultList = []
+# resultList = []
 
-for currentModel in modelList:
-    for currentRegion in regionList:
-        currentResult = results(currentModel, currentRegion)
-        resultList.append(currentResult)
+# for currentModel in modelList:
+#     for currentRegion in regionList:
+#         currentResult = results(currentModel, currentRegion)
+#         resultList.append(currentResult)
 
-resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
-resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
+# resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
+# resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
 
-for res in resultList:
-    res.verify()
+# for res in resultList:
+#     res.verify()
 
 
 # # %%
@@ -502,6 +502,34 @@ for res in resultList:
 
 # Plots
 ###############################################################################
+
+# %%
+# Plot v_infinity for resultsList
+###################################################
+
+# from itertools import cycle
+
+# prop_cycle = plt.rcParams['axes.prop_cycle']
+# colors = cycle(prop_cycle.by_key()['color'])
+
+# plt.figure(dpi = 200, facecolor = "white")
+
+# for res in resultList:
+#     advVelocity = (np.cbrt((3 * res.model.windToCREnergyFraction * res.region.energyDotWind * res.radius/(4 * res.region.massShell)))).to(u.km/u.s)
+
+#     color = color=next(colors)
+
+#     plt.plot(res.radius.to(u.pc), res.velocity.to(u.km/u.s), label = res.name, color = color)
+#     plt.plot(res.radius.to(u.pc), advVelocity, linestyle = "--", color = color)
+
+# plt.xscale('log')
+# plt.yscale('log')
+
+# plt.xlabel(f"Radius ({u.pc})")
+# plt.ylabel(f"Velocity ({u.km}/{u.s})")
+
+# plt.ylim(1)
+
 
 # %%
 # Proposal Plot results
@@ -526,18 +554,22 @@ ax[0].plot(proposalResultsOne.time.to(u.Myr), proposalResultsOne.velocity, label
 ax[0].plot(proposalResultsTwo.time.to(u.Myr), proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
 ax[0].plot(proposalResultsThree.time.to(u.Myr), proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
 
-ax[1].plot(proposalResultsOne.radius, proposalResultsOne.velocity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
-ax[1].plot(proposalResultsTwo.radius, proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
-ax[1].plot(proposalResultsThree.radius, proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+ax[1].plot(proposalResultsOne.time.to(u.Myr), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+ax[1].plot(proposalResultsTwo.time.to(u.Myr), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+ax[1].plot(proposalResultsThree.time.to(u.Myr), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
 
 ax[0].set_xscale('log')
 ax[0].set_yscale('log')
 ax[1].set_xscale('log')
 ax[1].set_yscale('log')
 
+# ax[0].set_ylim(10**-2)
+# ax[1].set_ylim(10**-2)
+
 ax[0].set_xlabel('Time (Myr)')
 ax[0].set_ylabel('Velocity (km/s)')
-ax[1].set_xlabel('Radius (pc)')
+ax[1].set_xlabel('Time (Myr)')
+ax[1].set_ylabel(r'$\gamma$-ray Luminosity (ergs/s)')
 
 ax[0].legend()
 
@@ -559,8 +591,8 @@ plt.plot(proposalResultsOne.radius, diffTerm, label = "Diffusion")
 plt.xscale("log")
 plt.yscale("log")
 
-plt.xlabel("Radius (pc)")
-plt.ylabel(f"dP/dr ({energyInjection.unit})")
+plt.xlabel("Radius")
+plt.ylabel(f"Pressure {energyInjection.unit}")
 
 plt.legend()
 
