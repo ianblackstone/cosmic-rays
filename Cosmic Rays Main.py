@@ -31,7 +31,7 @@ massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 10**4 # MSun
-gasDensityFiducial = 0 # MSun/pc^2
+externalGasDensityFiducial = 1 # g/cm^3
 
 # Turn on or off various pressures in the model.
 energyInjectionFiducial = True
@@ -127,7 +127,7 @@ class region:
             massShell = massShellFiducial,
             massNewStars = massNewStarsFiducial,
             massOldStars = massOldStarsFiducial,
-            gasDensity = gasDensityFiducial):
+            externalGasDensity = externalGasDensityFiducial):
         """_summary_
 
         Args:
@@ -140,7 +140,7 @@ class region:
             massShell (Float , optional): The mass of the gas shell. Input in solar masses, unit will be assigned to it. Defaults to massShellFiducial
             massNewStars (Float , optional): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it. Defaults to massNewStarsFiducial
             massOldStars (Float , optional): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total. Defaults to massOldStarsFiducial
-            gasDensity (Float , optional): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in ____. Not currently used. Defaults to gasDensityFiducial
+            externalGasDensity (Float , optional): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in g/cm^3. Defaults to externalGasDensityFiducial
 
         Additional parameters (automatically calculated):
             massTotal (Float): The total region mass in grams.
@@ -158,10 +158,8 @@ class region:
         self.massNewStars = (massNewStars * u.solMass).cgs
         self.massOldStars = (massOldStars * u.solMass).cgs
         self.massTotal = self.massNewStars + self.massShell
-        self.gasDensity = gasDensity
-        self.electronDensity = self.massShell / \
-            (4/3*np.pi*(self.radius)**3) / \
-            con.m_p.cgs
+        self.externalGasDensity = externalGasDensity * u.g / u.cm**3
+        self.electronDensity = self.massShell / (4/3*np.pi*(self.radius)**3) / con.m_p.cgs
         self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * np.pi * self.radius**4)).to(u.Ba)
 
     def __str__(self):
@@ -200,16 +198,21 @@ class results:
         self.velocity = (ODESolve.y[0] * u.cm/u.s).to(u.km/u.s)
         self.pressure = ODESolve.y[1] * u.Ba
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
+        self.massShell = ODESolve.y[3] * u.g
         self.mDotWind = (2 * self.region.energyDotWind / self.model.vWind**2).cgs
         self.innerShockGasDensity = (self.mDotWind / (4 * np.pi * self.radius**2 * self.model.vWind)).cgs
-        self.innerShockNumberDensity = self.innerShockGasDensity / con.m_p.cgs
+        self.innerShockNumberDensity = 4 * self.innerShockGasDensity / con.m_p.cgs
         self.tPion = self.model.pionLifetime / self.innerShockNumberDensity / u.cm**3
         self.tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).cgs
         self.tAdv = (self.radius/self.velocity).cgs
         self.energyCR = (self.pressure * 4 * np.pi * self.radius**3).cgs
-        self.gammaLuminosity = (1 / 3 * self.energyCR * self.model.windToCREnergyFraction * self.tDiff / self.tPion).cgs
+        self.gammaLuminosity = (1 / 3 * self.energyCR / self.tPion).cgs
 
-        self.dvdr, self.dpdr, _ = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value], self.region, self.model)
+        self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value, self.massShell.value], self.region, self.model)
+
+        self.effectiveExternalOpticalDepth = np.sqrt(self.radius**2 * self.region.externalGasDensity / con.m_p / (self.model.meanFreePath * con.c * self.model.pionLifetime)).cgs
+
+        self.externalGammaLuminosity = (self.region.energyDotWind * self.model.windToCREnergyFraction - self.gammaLuminosity)*(1-np.exp(-self.effectiveExternalOpticalDepth.cgs))
 
     def save(self):
         with open("Results/" + self.name, 'ab') as file:
@@ -354,14 +357,14 @@ def getDVDR(rShell, X, region, model):
 
     Args:
         rShell (number): The radius of the shell in cm
-        X (array): An array with the current value of [vShell, pCR, t].
+        X (array): An array with the current value of [vShell, pCR, t, mShell].
         region (region): The current region
         model (model): The current model
 
     Returns:
         array of numbers: Returns [dv/dr, dp/dr, dt/dr]
     """
-    vShell, pCR, t = X
+    vShell, pCR, t, mShell = X
 
     dpdr = 0
 
@@ -378,17 +381,20 @@ def getDVDR(rShell, X, region, model):
     if model.streamPressure:
         dpdr -= 0  # To-Do
 
-    dvdr = pCR * 4 * np.pi * rShell**2/(region.massShell.value*vShell) - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/(vShell*rShell**2)
+    dvdr = pCR * 4 * np.pi * rShell**2/(mShell*vShell) - con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
     # Old dvdr that uses P ~ Edot * t
     # dvdr =  model.windToCREnergyFraction*region.energyDotWind*model.coverageFraction / rShell /(region.massShell*vShell) * getMinimumTime(rShell, vShell, model.meanFreePath, region.pionTime) - G*(region.massShell + region.massNewStars)/(vShell*rShell**2)
 
+    dmdr = 0
+
     if model.sweepUpMass:
-        dvdr -= vShell*4*np.pi*region.gasDensity.value * (rShell - model.gasColumnHeight.value)**2 / region.massShell.value
+        dmdr = 4 * np.pi * region.externalGasDensity.value * rShell**2
+        dvdr -= vShell * dmdr / mShell
 
     dtdr = 1/abs(vShell)
 
-    return [dvdr, dpdr, dtdr]
+    return [dvdr, dpdr, dtdr, dmdr]
 
 def getDVDT(t, X, region, model):
     """Set of coupled ODEs giving dv/dt, dp/dt, and dr/dt
@@ -435,7 +441,7 @@ def solveODE(model, region, verbose = True):
     Returns:
         ODESolve: A solve_ivp object.
     """
-    X0 = [model.vInitial.value, model.eddRatio * region.eddPressure.value, region.age.value]
+    X0 = [model.vInitial.value, model.eddRatio * region.eddPressure.value, region.age.value, region.massShell.value]
 
     rSpan = (model.gasColumnHeight.value, 1000*model.gasColumnHeight.value)
 
@@ -550,25 +556,31 @@ proposalResultsThree = results(proposalModelThree, proposalRegion)
 
 fig, ax = plt.subplots(1,2, dpi = 200, figsize = (10,4), facecolor = "white")
 
-ax[0].plot(proposalResultsOne.time.to(u.Myr), proposalResultsOne.velocity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
-ax[0].plot(proposalResultsTwo.time.to(u.Myr), proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
-ax[0].plot(proposalResultsThree.time.to(u.Myr), proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+ax[0].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.velocity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+ax[0].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+ax[0].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
 
-ax[1].plot(proposalResultsOne.time.to(u.Myr), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
-ax[1].plot(proposalResultsTwo.time.to(u.Myr), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
-ax[1].plot(proposalResultsThree.time.to(u.Myr), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+
+ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, 'b--')
+ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, 'g--')
+ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, 'r--')
 
 ax[0].set_xscale('log')
 ax[0].set_yscale('log')
 ax[1].set_xscale('log')
 ax[1].set_yscale('log')
 
-# ax[0].set_ylim(10**-2)
-# ax[1].set_ylim(10**-2)
+ax[0].set_xlim(10,500)
+ax[1].set_xlim(10,500)
 
-ax[0].set_xlabel('Time (Myr)')
+ax[1].set_ylim(float(10**29))
+
+ax[0].set_xlabel('Radius (pc)')
 ax[0].set_ylabel('Velocity (km/s)')
-ax[1].set_xlabel('Time (Myr)')
+ax[1].set_xlabel('Radius (pc)')
 ax[1].set_ylabel(r'$\gamma$-ray Luminosity (ergs/s)')
 
 ax[0].legend()
