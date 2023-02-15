@@ -31,7 +31,7 @@ massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 10**4 # MSun
-externalGasDensityFiducial = 1 # g/cm^3
+externalGasDensityFiducial = 1 # protons/cm^3
 
 # Turn on or off various pressures in the model.
 energyInjectionFiducial = True
@@ -140,7 +140,7 @@ class region:
             massShell (Float , optional): The mass of the gas shell. Input in solar masses, unit will be assigned to it. Defaults to massShellFiducial
             massNewStars (Float , optional): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it. Defaults to massNewStarsFiducial
             massOldStars (Float , optional): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total. Defaults to massOldStarsFiducial
-            externalGasDensity (Float , optional): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in g/cm^3. Defaults to externalGasDensityFiducial
+            externalGasDensity (Float , optional): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in protons/cm^3, will be converted to g/cm^3. Defaults to externalGasDensityFiducial
 
         Additional parameters (automatically calculated):
             massTotal (Float): The total region mass in grams.
@@ -158,7 +158,7 @@ class region:
         self.massNewStars = (massNewStars * u.solMass).cgs
         self.massOldStars = (massOldStars * u.solMass).cgs
         self.massTotal = self.massNewStars + self.massShell
-        self.externalGasDensity = externalGasDensity * u.g / u.cm**3
+        self.externalGasDensity = (externalGasDensity * con.m_p / u.cm**3).cgs
         self.electronDensity = self.massShell / (4/3*np.pi*(self.radius)**3) / con.m_p.cgs
         self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * np.pi * self.radius**4)).to(u.Ba)
 
@@ -210,9 +210,14 @@ class results:
 
         self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value, self.massShell.value], self.region, self.model)
 
-        self.effectiveExternalOpticalDepth = np.sqrt(self.radius**2 * self.region.externalGasDensity / con.m_p / (self.model.meanFreePath * con.c * self.model.pionLifetime)).cgs
+        self.tauPi = (self.radius * (self.region.externalGasDensity / con.m_p * u.cm**3)/(con.c * self.model.pionLifetime)).cgs
+        self.tauScatt = (self.radius/self.model.meanFreePath).cgs
 
-        self.externalGammaLuminosity = (self.region.energyDotWind * self.model.windToCREnergyFraction - self.gammaLuminosity)*(1-np.exp(-self.effectiveExternalOpticalDepth.cgs))
+        self.effectiveExternalOpticalDepth = np.sqrt(self.tauPi*(self.tauPi + self.tauScatt)).cgs
+
+        self.advectionLosses = self.energyCR*self.velocity/self.radius/3
+
+        self.externalGammaLuminosity = self.energyCR/3/self.tDiff*(1-np.exp(-self.effectiveExternalOpticalDepth.cgs))
 
     def save(self):
         with open("Results/" + self.name, 'ab') as file:
@@ -452,6 +457,23 @@ def solveODE(model, region, verbose = True):
 
     return ODESolve
 
+def findNearest(array, value):
+    """Finds the nearest value in an array and returns the index
+
+    Args:
+        array (array): Array of numbers to search.
+        value (array): Array of the values to search for.
+
+    Returns:
+        index (int): The index of the nearest value.
+    """
+    array = np.asarray(array)
+    value = np.asarray(value)
+    index = np.zeros_like(value)
+    for i, val in enumerate(value):
+        index[i] = (np.abs(array - val)).argmin()
+    return index
+
 # Define  basic models
 ###############################################################################
 # Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
@@ -560,13 +582,43 @@ ax[0].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.velocity, labe
 ax[0].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
 ax[0].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
 
-ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
-ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
-ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
 
-ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, 'b--')
-ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, 'g--')
-ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, 'r--')
+# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, linestyle = 'dashed', c = "C0")
+# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, linestyle = 'dashed', c = "C1")
+# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, linestyle = 'dashed', c = "C2")
+
+# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.advectionLosses.cgs, linestyle = 'dotted', c = "C0")
+# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.advectionLosses.cgs, linestyle = 'dotted', c = "C1")
+# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.advectionLosses.cgs, linestyle = 'dotted', c = "C2")
+
+# energyInput = proposalResultsOne.region.energyDotWind.cgs/3 * proposalResultsOne.model.windToCREnergyFraction
+
+# ax[1].plot(proposalResultsOne.radius.to(u.pc), energyInput*np.ones_like(proposalResultsOne.radius.value), 'k')
+
+ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, c = "C0")
+ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, c = "C1")
+ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, c = "C2")
+
+# Find these times for putting on the plot
+times = [10**6, 3*10**6, 10**7]
+
+proposalResultsOneTimes = findNearest(proposalResultsOne.time.value - 10**6, times)
+proposalResultsTwoTimes = findNearest(proposalResultsTwo.time.value - 10**6, times)
+proposalResultsThreeTimes = findNearest(proposalResultsThree.time.value - 10**6, times)
+
+ax[0].scatter(proposalResultsOne.radius.to(u.pc)[proposalResultsOneTimes], proposalResultsOne.velocity[proposalResultsOneTimes], c = "C0")
+ax[0].scatter(proposalResultsTwo.radius.to(u.pc)[proposalResultsTwoTimes], proposalResultsTwo.velocity[proposalResultsTwoTimes], c = "C1")
+ax[0].scatter(proposalResultsThree.radius.to(u.pc)[proposalResultsThreeTimes], proposalResultsThree.velocity[proposalResultsThreeTimes], c = "C2")
+
+ax[1].scatter(proposalResultsOne.radius.to(u.pc)[proposalResultsOneTimes], (proposalResultsOne.externalGammaLuminosity)[proposalResultsOneTimes], c = "C0")
+ax[1].scatter(proposalResultsTwo.radius.to(u.pc)[proposalResultsTwoTimes], (proposalResultsTwo.externalGammaLuminosity)[proposalResultsTwoTimes], c = "C1")
+ax[1].scatter(proposalResultsThree.radius.to(u.pc)[proposalResultsThreeTimes], (proposalResultsThree.externalGammaLuminosity)[proposalResultsThreeTimes], c = "C2")
+
+ax[1].fill_between([10,50], 0.7*10**34, 1.5*10**34, facecolor = "grey", alpha = 0.2)
+
 
 ax[0].set_xscale('log')
 ax[0].set_yscale('log')
@@ -576,7 +628,7 @@ ax[1].set_yscale('log')
 ax[0].set_xlim(10,500)
 ax[1].set_xlim(10,500)
 
-ax[1].set_ylim(float(10**29))
+ax[1].set_ylim(float(5*10**32))
 
 ax[0].set_xlabel('Radius (pc)')
 ax[0].set_ylabel('Velocity (km/s)')
@@ -586,27 +638,29 @@ ax[1].set_ylabel(r'$\gamma$-ray Luminosity (ergs/s)')
 ax[0].legend()
 
 # %%
+
+# %%
 # Plot verification
 
-plt.figure(dpi = 200)
+# plt.figure(dpi = 200)
 
-energyInjection = (proposalResultsOne.model.windToCREnergyFraction * proposalResultsOne.region.energyDotWind / (4 * np.pi * proposalResultsOne.radius**3 * proposalResultsOne.velocity)).cgs
+# energyInjection = (proposalResultsOne.model.windToCREnergyFraction * proposalResultsOne.region.energyDotWind / (4 * np.pi * proposalResultsOne.radius**3 * proposalResultsOne.velocity)).cgs
 
-diffTerm = (con.c  * proposalResultsOne.model.meanFreePath * proposalResultsOne.pressure / (proposalResultsOne.velocity * proposalResultsOne.radius**2)).cgs
+# diffTerm = (con.c  * proposalResultsOne.model.meanFreePath * proposalResultsOne.pressure / (proposalResultsOne.velocity * proposalResultsOne.radius**2)).cgs
 
-advTerm = (4* proposalResultsOne.pressure / proposalResultsOne.radius).cgs
+# advTerm = (4* proposalResultsOne.pressure / proposalResultsOne.radius).cgs
 
-plt.plot(proposalResultsOne.radius, energyInjection, label = "Energy Injection")
-plt.plot(proposalResultsOne.radius, advTerm, label = "Advection")
-plt.plot(proposalResultsOne.radius, diffTerm, label = "Diffusion")
+# plt.plot(proposalResultsOne.radius, energyInjection, label = "Energy Injection")
+# plt.plot(proposalResultsOne.radius, advTerm, label = "Advection")
+# plt.plot(proposalResultsOne.radius, diffTerm, label = "Diffusion")
 
-plt.xscale("log")
-plt.yscale("log")
+# plt.xscale("log")
+# plt.yscale("log")
 
-plt.xlabel("Radius")
-plt.ylabel(f"Pressure {energyInjection.unit}")
+# plt.xlabel("Radius")
+# plt.ylabel(f"Pressure {energyInjection.unit}")
 
-plt.legend()
+# plt.legend()
 
 
 # %%
