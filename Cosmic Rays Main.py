@@ -22,6 +22,8 @@ vInitialFiducial = 1 # km/s
 tInitialFiducial = 0 # yr
 eddRatioFiducial = 2 # We assume that all regions are 2x Eddington by default
 pionLifetimeFiducial = 5*10**7 # yr
+vAlphaneFiducial = 10 # km/s
+externalMassScaleFiducial = 0 # External masss density will scale as (r0/r)^x where this is x
 
 ageFiducial = 1 # Myr
 luminosityFiducial = 10**8 # LSun
@@ -70,12 +72,14 @@ class model:
                 coverageFraction = coverageFractionFiducial,
                 eddRatio = eddRatioFiducial,
                 pionLifetime = pionLifetimeFiducial,
+                vAlphane = vAlphaneFiducial,
                 energyInjection = energyInjectionFiducial,
                 advectionPressure = advectionPressureFiducial,
                 diffusionPressure = diffusionPressureFiducial,
                 pionPressure = pionPressureFiducial,
                 streamPressure = streamPressureFiducial,
-                sweepUpMass = sweepUpMassFiducial):
+                sweepUpMass = sweepUpMassFiducial,
+                externalMassScale = externalMassScaleFiducial):
         """A model object contains the base data and parameters not related to region data for calculations.
 
         Args:
@@ -89,12 +93,14 @@ class model:
             coverageFraction (Float, optional): Shell coverage fraction. Defaults to coverageFractionFiducial.
             eddRatio (Float, optional): The initial Eddington ratio. Defaults to eddRatioFiducial.
             pionLifetime (Float, optional): The pion lifetime scale. Input in yr, will be converted to s and a unit label added. Defaults to pionLifetimeFiducial
+            vAlphane (Floar, optional): The Alphane velocity of the model. Given in km/s, will be converted to cgs. Defaults to vAlphaneFiducial.
             energyInjection (Boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
             advectionPressure (Boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
             diffusionPressure (Boolean, optional): Boolean to enable diffusion in the model. Defaults to diffusionPressureFiducial.
             pionPressure (Boolean, optional): Boolean to enable pion decay in the model. Defaults to pionPressureFiducial.
             streamPressure (Boolean, optional): Boolean to enable streaming in the model, not currently implemented. Defaults to streamPressureFiducial.
             sweepUpMass (Boolean, optional): Boolean to enable the sweeping up of additional mass in the model. Defaults to sweepUpMassFiducial.
+            externalMassScale (float, optional): The scale factor for externally swept up mass. Defaults to externalMassScaleFiducial
         """
         self.name = name
         self.meanFreePath = (meanFreePath * u.pc).cgs
@@ -104,6 +110,7 @@ class model:
         self.coverageFraction = coverageFraction
         self.eddRatio = eddRatio
         self.pionLifetime = (pionLifetime * u.yr).cgs
+        self.vAlphane = (vAlphane * u.km/u.s).cgs
         self.vInitial = (vInitial * u.km / u.s).cgs
         self.tInitial = (tInitial * u.yr).cgs
         self.energyInjection = energyInjection
@@ -112,6 +119,7 @@ class model:
         self.pionPressure = pionPressure
         self.streamPressure = streamPressure
         self.sweepUpMass = sweepUpMass
+        self.externalMassScale = externalMassScale
 
     def __str__(self):
         return f"Model: {self.name}"
@@ -374,8 +382,7 @@ def getDVDR(rShell, X, region, model):
     dpdr = 0
 
     if model.energyInjection:
-        dpdr += model.windToCREnergyFraction * \
-            region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
+        dpdr += model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
 
     if model.advectionPressure:
         dpdr -= 4 * pCR / rShell
@@ -384,7 +391,7 @@ def getDVDR(rShell, X, region, model):
         dpdr -= con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
 
     if model.streamPressure:
-        dpdr -= 0  # To-Do
+        dpdr -=  model.windToCREnergyFraction * region.energyDotWind.value / model.vAlphane.value
 
     dvdr = pCR * 4 * np.pi * rShell**2/(mShell*vShell) - con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
@@ -394,7 +401,7 @@ def getDVDR(rShell, X, region, model):
     dmdr = 0
 
     if model.sweepUpMass:
-        dmdr = 4 * np.pi * region.externalGasDensity.value * rShell**2
+        dmdr = 4 * np.pi * region.externalGasDensity.value * (model.gasColumnHeight.value/rShell)**model.externalMassScale * rShell**2
         dvdr -= vShell * dmdr / mShell
 
     dtdr = 1/abs(vShell)
@@ -493,33 +500,33 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-# modelOne = model("lambda CR: 0.01 pc, R0: 10 pc")
-# modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
-# modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
-# modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
+modelOne = model("lambda CR: 0.01 pc, R0: 10 pc")
+modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
+modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
+modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
 
-# regionOne = region(r"MShell: $10^4$ $M_\odot$")
-# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
-# regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
+regionOne = region(r"MShell: $10^4$ $M_\odot$")
+regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
+regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 
-# modelList = [modelOne, modelTwo, modelThree, modelFour]
-# regionList = [regionOne, regionTwo, regionThree]
+modelList = [modelOne, modelTwo, modelThree, modelFour]
+regionList = [regionOne, regionTwo, regionThree]
 
-# modelList = [modelThree]
-# regionList = [regionTwo]
+modelList = [modelThree]
+regionList = [regionTwo]
 
-# resultList = []
+resultList = []
 
-# for currentModel in modelList:
-#     for currentRegion in regionList:
-#         currentResult = results(currentModel, currentRegion)
-#         resultList.append(currentResult)
+for currentModel in modelList:
+    for currentRegion in regionList:
+        currentResult = results(currentModel, currentRegion)
+        resultList.append(currentResult)
 
-# resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
-# resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
+resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
+resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
 
-# for res in resultList:
-#     res.verify()
+for res in resultList:
+    res.verify()
 
 
 # # %%
@@ -563,81 +570,82 @@ testRegion = region("Test Region")
 # Proposal Plot results
 ###################################################
 
-proposalRegion = region("proposal region", massShell = 10**3)
-proposalModelOne = model("lambda 0.01 pc", meanFreePath = 0.01)
-proposalModelTwo = model("lambda 0.03 pc", meanFreePath = 0.03)
-proposalModelThree = model("lambda 0.1 pc", meanFreePath = 0.1)
+# proposalRegion = region("proposal region", massShell = 10**3)
+# proposalModelOne = model("Constant", meanFreePath = 0.01, sweepUpMass= True)
+# proposalModelTwo = model(r"$R^{-1}$", meanFreePath = 0.01, sweepUpMass= True, externalMassScale = 1)
+# proposalModelThree = model(r"$R^{-2}$", meanFreePath = 0.01, sweepUpMass= True, externalMassScale = 2)
 
-proposalResultsOne = results(proposalModelOne, proposalRegion)
-proposalResultsTwo = results(proposalModelTwo, proposalRegion)
-proposalResultsThree = results(proposalModelThree, proposalRegion)
+# proposalResultsOne = results(proposalModelOne, proposalRegion)
+# proposalResultsTwo = results(proposalModelTwo, proposalRegion)
+# proposalResultsThree = results(proposalModelThree, proposalRegion)
 
 # %%
 # Proposal plots
 ###################################################
 
-fig, ax = plt.subplots(1,2, dpi = 200, figsize = (10,4), facecolor = "white")
+# fig, ax = plt.subplots(1,2, dpi = 200, figsize = (10,4), facecolor = "white")
 
-ax[0].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.velocity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
-ax[0].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.velocity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
-ax[0].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.velocity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+# ax[0].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.velocity, label = "Constant")
+# ax[0].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.velocity, label = r"$R^{-1}$")
+# ax[0].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.velocity, label = r"$R^{-2}$")
 
-# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
-# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
-# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
+# # ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.01\,$ pc")
+# # ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.03\,$ pc")
+# # ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.gammaLuminosity, label = r"$\lambda_{\rm CR} = 0.1\,$ pc")
 
-# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, linestyle = 'dashed', c = "C0")
-# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, linestyle = 'dashed', c = "C1")
-# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, linestyle = 'dashed', c = "C2")
+# # ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, linestyle = 'dashed', c = "C0")
+# # ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, linestyle = 'dashed', c = "C1")
+# # ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, linestyle = 'dashed', c = "C2")
 
-# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.advectionLosses.cgs, linestyle = 'dotted', c = "C0")
-# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.advectionLosses.cgs, linestyle = 'dotted', c = "C1")
-# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.advectionLosses.cgs, linestyle = 'dotted', c = "C2")
+# # ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.advectionLosses.cgs, linestyle = 'dotted', c = "C0")
+# # ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.advectionLosses.cgs, linestyle = 'dotted', c = "C1")
+# # ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.advectionLosses.cgs, linestyle = 'dotted', c = "C2")
 
-# energyInput = proposalResultsOne.region.energyDotWind.cgs/3 * proposalResultsOne.model.windToCREnergyFraction
+# # energyInput = proposalResultsOne.region.energyDotWind.cgs/3 * proposalResultsOne.model.windToCREnergyFraction
 
-# ax[1].plot(proposalResultsOne.radius.to(u.pc), energyInput*np.ones_like(proposalResultsOne.radius.value), 'k')
+# # ax[1].plot(proposalResultsOne.radius.to(u.pc), energyInput*np.ones_like(proposalResultsOne.radius.value), 'k')
 
-ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, c = "C0")
-ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, c = "C1")
-ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, c = "C2")
+# ax[1].plot(proposalResultsOne.radius.to(u.pc), proposalResultsOne.externalGammaLuminosity, c = "C0")
+# ax[1].plot(proposalResultsTwo.radius.to(u.pc), proposalResultsTwo.externalGammaLuminosity, c = "C1")
+# ax[1].plot(proposalResultsThree.radius.to(u.pc), proposalResultsThree.externalGammaLuminosity, c = "C2")
 
-# Find these times for putting on the plot
-times = [10**6, 3*10**6, 10**7]
+# # Find these times for putting on the plot
+# times = [10**6, 2*10**6, 4*10**6]
 
-proposalResultsOneTimes = findNearest(proposalResultsOne.time.value - 10**6, times)
-proposalResultsTwoTimes = findNearest(proposalResultsTwo.time.value - 10**6, times)
-proposalResultsThreeTimes = findNearest(proposalResultsThree.time.value - 10**6, times)
+# proposalResultsOneTimes = findNearest(proposalResultsOne.time.value - 10**6, times)
+# proposalResultsTwoTimes = findNearest(proposalResultsTwo.time.value - 10**6, times)
+# proposalResultsThreeTimes = findNearest(proposalResultsThree.time.value - 10**6, times)
 
-ax[0].scatter(proposalResultsOne.radius.to(u.pc)[proposalResultsOneTimes], proposalResultsOne.velocity[proposalResultsOneTimes], c = "C0")
-ax[0].scatter(proposalResultsTwo.radius.to(u.pc)[proposalResultsTwoTimes], proposalResultsTwo.velocity[proposalResultsTwoTimes], c = "C1")
-ax[0].scatter(proposalResultsThree.radius.to(u.pc)[proposalResultsThreeTimes], proposalResultsThree.velocity[proposalResultsThreeTimes], c = "C2")
+# ax[0].scatter(proposalResultsOne.radius.to(u.pc)[proposalResultsOneTimes], proposalResultsOne.velocity[proposalResultsOneTimes], c = "C0")
+# ax[0].scatter(proposalResultsTwo.radius.to(u.pc)[proposalResultsTwoTimes], proposalResultsTwo.velocity[proposalResultsTwoTimes], c = "C1")
+# ax[0].scatter(proposalResultsThree.radius.to(u.pc)[proposalResultsThreeTimes], proposalResultsThree.velocity[proposalResultsThreeTimes], c = "C2")
 
-ax[1].scatter(proposalResultsOne.radius.to(u.pc)[proposalResultsOneTimes], (proposalResultsOne.externalGammaLuminosity)[proposalResultsOneTimes], c = "C0")
-ax[1].scatter(proposalResultsTwo.radius.to(u.pc)[proposalResultsTwoTimes], (proposalResultsTwo.externalGammaLuminosity)[proposalResultsTwoTimes], c = "C1")
-ax[1].scatter(proposalResultsThree.radius.to(u.pc)[proposalResultsThreeTimes], (proposalResultsThree.externalGammaLuminosity)[proposalResultsThreeTimes], c = "C2")
+# ax[1].scatter(proposalResultsOne.radius.to(u.pc)[proposalResultsOneTimes], (proposalResultsOne.externalGammaLuminosity)[proposalResultsOneTimes], c = "C0")
+# ax[1].scatter(proposalResultsTwo.radius.to(u.pc)[proposalResultsTwoTimes], (proposalResultsTwo.externalGammaLuminosity)[proposalResultsTwoTimes], c = "C1")
+# ax[1].scatter(proposalResultsThree.radius.to(u.pc)[proposalResultsThreeTimes], (proposalResultsThree.externalGammaLuminosity)[proposalResultsThreeTimes], c = "C2")
 
-ax[1].fill_between([10,50], 0.7*10**34, 1.5*10**34, facecolor = "grey", alpha = 0.2)
+# # ax[1].fill_between([10,50], 0.7*10**34, 1.5*10**34, facecolor = "grey", alpha = 0.2)
 
 
-ax[0].set_xscale('log')
-ax[0].set_yscale('log')
-ax[1].set_xscale('log')
-ax[1].set_yscale('log')
+# ax[0].set_xscale('log')
+# ax[0].set_yscale('log')
+# ax[1].set_xscale('log')
+# ax[1].set_yscale('log')
 
-ax[0].set_xlim(10,500)
-ax[1].set_xlim(10,500)
+# ax[0].set_xlim(10,500)
+# ax[1].set_xlim(10,500)
 
-ax[1].set_ylim(float(5*10**32))
+# ax[1].set_ylim(float(5*10**32))
+# ax[0].set_ylim(1,100)
 
-ax[0].set_xlabel('Radius (pc)')
-ax[0].set_ylabel('Velocity (km/s)')
-ax[1].set_xlabel('Radius (pc)')
-ax[1].set_ylabel(r'$\gamma$-ray Luminosity (ergs/s)')
+# ax[0].set_xlabel('Radius (pc)')
+# ax[0].set_ylabel('Velocity (km/s)')
+# ax[1].set_xlabel('Radius (pc)')
+# ax[1].set_ylabel(r'$\gamma$-ray Luminosity (ergs/s)')
 
-ax[0].legend()
+# ax[0].legend()
 
-# %%
+#  %%
 
 # %%
 # Plot verification
