@@ -213,6 +213,7 @@ class results:
         self.tPion = self.model.pionLifetime / self.innerShockNumberDensity / u.cm**3
         self.tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).cgs
         self.tAdv = (self.radius/self.velocity).cgs
+        self.tStream = (self.radius/self.model.vAlphane).cgs
         self.energyCR = (self.pressure * 4 * np.pi * self.radius**3).cgs
         self.gammaLuminosity = (1 / 3 * self.energyCR / self.tPion).cgs
 
@@ -391,7 +392,7 @@ def getDVDR(rShell, X, region, model):
         dpdr -= con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
 
     if model.streamPressure:
-        dpdr -=  model.windToCREnergyFraction * region.energyDotWind.value / model.vAlphane.value
+        dpdr -=  12 * (vShell + model.vAlphane.value) * pCR / ( rShell * vShell)
 
     dvdr = pCR * 4 * np.pi * rShell**2/(mShell*vShell) - con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
@@ -512,8 +513,8 @@ regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 modelList = [modelOne, modelTwo, modelThree, modelFour]
 regionList = [regionOne, regionTwo, regionThree]
 
-modelList = [modelThree]
-regionList = [regionTwo]
+# modelList = [modelOne]
+# regionList = [regionThree]
 
 resultList = []
 
@@ -525,8 +526,8 @@ for currentModel in modelList:
 resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
 resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
 
-for res in resultList:
-    res.verify()
+# for res in resultList:
+#     res.verify()
 
 
 # # %%
