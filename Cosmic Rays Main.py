@@ -392,7 +392,7 @@ def getDVDR(rShell, X, region, model):
         dpdr -= con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
 
     if model.streamPressure:
-        dpdr -=  12 * (vShell + model.vAlphane.value) * pCR / ( rShell * vShell)
+        dpdr -= (3*vShell + model.vAlphane.value) * pCR / ( rShell * vShell)
 
     dvdr = pCR * 4 * np.pi * rShell**2/(mShell*vShell) - con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
@@ -408,8 +408,6 @@ def getDVDR(rShell, X, region, model):
     dtdr = 1/abs(vShell)
 
     return [dvdr, dpdr, dtdr, dmdr]
-
-def getDVDT(t, X, region, model):
     """Set of coupled ODEs giving dv/dt, dp/dt, and dr/dt
 
     Args:
