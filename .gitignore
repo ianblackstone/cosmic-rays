@@ -3,3 +3,4 @@ Plots/Scratch/
 classes.py
 __pycache__/classes.cpython-39.pyc
 *.result
+*.dat
