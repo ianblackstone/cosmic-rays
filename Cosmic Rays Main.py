@@ -2,9 +2,9 @@
 from matplotlib import pyplot as plt
 import numpy as np
 import pickle
+import math
 from scipy import integrate as inte
 from scipy.optimize import fsolve
-# from hoki import load
 from astropy import constants as con
 from astropy import units as u
 from matplotlib.collections import LineCollection
@@ -22,14 +22,15 @@ vInitialFiducial = 1 # km/s
 tInitialFiducial = 0 # yr
 eddRatioFiducial = 2 # We assume that all regions are 2x Eddington by default
 pionLifetimeFiducial = 5*10**7 # yr
-vAlphaneFiducial = 10 # km/s
+vAlfvenFiducial = 10 # km/s
 externalMassScaleFiducial = 0 # External masss density will scale as (r0/r)^x where this is x
+luminosityPerMassFiducial = 1500 # LSun/MSun The solar luminosities per mass for a star cluster.
 
 ageFiducial = 1 # Myr
-luminosityFiducial = 10**8 # LSun
+# luminosityFiducial = 10**8 # LSun
 radiusFiducial = 100 # pc
 radiusOldStarsFiducial = 10**4 # pc
-massShellFiducial = 10**4 # MSun
+massShellFiducial = 10**5 # MSun
 massNewStarsFiducial = 10**4 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 10**4 # MSun
@@ -40,13 +41,9 @@ energyInjectionFiducial = True
 advectionPressureFiducial = True
 diffusionPressureFiducial = True
 pionPressureFiducial = True
-streamPressureFiducial = True
+streamPressureFiducial = False
 sweepUpMassFiducial = False
-###############################################################################
-
-# 30 Dor
-# Edot wind 2.2 × 1039 erg s−1
-# vshell 25 km s−1
+radiationPressureFiducial = False
 
 ###############################################################################
 # Code for calculating the cosmic ray pressure on regions of a galaxy.
@@ -58,8 +55,6 @@ sweepUpMassFiducial = False
 # %%
 # Define a class for models.
 ###############################################################################
-
-
 class model:
     # All units read from a model are cgs unless specified. Inputs are in more convenient units.
     def __init__(self, name,
@@ -72,13 +67,14 @@ class model:
                 coverageFraction = coverageFractionFiducial,
                 eddRatio = eddRatioFiducial,
                 pionLifetime = pionLifetimeFiducial,
-                vAlphane = vAlphaneFiducial,
+                vAlfven = vAlfvenFiducial,
                 energyInjection = energyInjectionFiducial,
                 advectionPressure = advectionPressureFiducial,
                 diffusionPressure = diffusionPressureFiducial,
                 pionPressure = pionPressureFiducial,
                 streamPressure = streamPressureFiducial,
                 sweepUpMass = sweepUpMassFiducial,
+                radiationPressure = radiationPressureFiducial,
                 externalMassScale = externalMassScaleFiducial):
         """A model object contains the base data and parameters not related to region data for calculations.
 
@@ -98,9 +94,10 @@ class model:
             advectionPressure (Boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
             diffusionPressure (Boolean, optional): Boolean to enable diffusion in the model. Defaults to diffusionPressureFiducial.
             pionPressure (Boolean, optional): Boolean to enable pion decay in the model. Defaults to pionPressureFiducial.
-            streamPressure (Boolean, optional): Boolean to enable streaming in the model, not currently implemented. Defaults to streamPressureFiducial.
+            streamPressure (Boolean, optional): Boolean to enable streaming in the model. Defaults to streamPressureFiducial.
             sweepUpMass (Boolean, optional): Boolean to enable the sweeping up of additional mass in the model. Defaults to sweepUpMassFiducial.
-            externalMassScale (float, optional): The scale factor for externally swept up mass. Defaults to externalMassScaleFiducial
+            radiationPressure (Boolean, optional): Boolean to enable radiation pressure in the model. Defaults to radiationPressureFiducial.
+            externalMassScale (Float, optional): The scale factor for externally swept up mass. Defaults to externalMassScaleFiducial
         """
         self.name = name
         self.meanFreePath = (meanFreePath * u.pc).cgs
@@ -110,7 +107,7 @@ class model:
         self.coverageFraction = coverageFraction
         self.eddRatio = eddRatio
         self.pionLifetime = (pionLifetime * u.yr).cgs
-        self.vAlphane = (vAlphane * u.km/u.s).cgs
+        self.vAlphane = (vAlfven * u.km/u.s).cgs
         self.vInitial = (vInitial * u.km / u.s).cgs
         self.tInitial = (tInitial * u.yr).cgs
         self.energyInjection = energyInjection
@@ -120,6 +117,7 @@ class model:
         self.streamPressure = streamPressure
         self.sweepUpMass = sweepUpMass
         self.externalMassScale = externalMassScale
+        self.radiationPressure = radiationPressure
 
     def __str__(self):
         return f"Model: {self.name}"
@@ -128,20 +126,21 @@ class region:
     # All units are cgs unless specified
     def __init__(self, name,
             age = ageFiducial,
-            luminosity = luminosityFiducial,
+            luminosity = None,
             energyDotWind = energyDotWindFiducial,
             radius = radiusFiducial,
             radiusOldStars = radiusOldStarsFiducial,
             massShell = massShellFiducial,
             massNewStars = massNewStarsFiducial,
             massOldStars = massOldStarsFiducial,
-            externalGasDensity = externalGasDensityFiducial):
+            externalGasDensity = externalGasDensityFiducial,
+            luminosityPerMass = luminosityPerMassFiducial):
         """_summary_
 
         Args:
             name (String): The region name or reference.
             age (Float , optional): Region age. Input in Myr, unit will be assigned to it. Defaults to ageFiducial
-            luminosity (Float , optional): Stellar luminosity of the region. Input in solar luminosities, unit will be assigned to it. Defaults to luminosityFiducial
+            luminosity (Float , optional): Stellar luminosity of the region. Input in solar luminosities, unit will be assigned to it. Will be calculated automatically if not set.
             energyDotWind (Float , optional): The energy input to the region from stellar wind. Input in solar luminosities, unit will be assigned to it. Defaults to energyDotWindFiducial
             radius (Float , optional): The radius of the region. Input in pc, unit will be assigned to it. Currently not used in favor of the model's gasColumnHeight. Defaults to radiusFiducial
             radiusOldStars (Float , optional): The radius of the old stellar population. Input in pc, unit will be assigned to it. Defaults to radiusOldStarsFiducial
@@ -149,6 +148,7 @@ class region:
             massNewStars (Float , optional): The mass of new stars in the cluster. Input in solar masses, unit will be assigned to it. Defaults to massNewStarsFiducial
             massOldStars (Float , optional): The mass of old stars in the cluster. Input in solar masses, unit will be assigned to it. This is not the enclosed old stellar mass, but the total. Defaults to massOldStarsFiducial
             externalGasDensity (Float , optional): The density of cold gas outside the gas shell, which provides the material to be swept up. Input in protons/cm^3, will be converted to g/cm^3. Defaults to externalGasDensityFiducial
+            luminosityPerMass (Float, optional): The luminosity per mass of the stellar cluster. Input in solar luminosities per solar mass, will be converted to cgs. Defaults to luminosityPerMassFiducial
 
         Additional parameters (automatically calculated):
             massTotal (Float): The total region mass in grams.
@@ -158,7 +158,6 @@ class region:
         """
         self.name = name
         self.age = (age * u.Myr).cgs
-        self.luminosity = (luminosity * u.solLum).cgs
         self.energyDotWind = (energyDotWind * u.solLum).cgs
         self.radius = (radius * u.pc).cgs
         self.radiusOldStars = (radiusOldStars * u.pc).cgs
@@ -169,6 +168,11 @@ class region:
         self.externalGasDensity = (externalGasDensity * con.m_p / u.cm**3).cgs
         self.electronDensity = self.massShell / (4/3*np.pi*(self.radius)**3) / con.m_p.cgs
         self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * np.pi * self.radius**4)).to(u.Ba)
+        self.luminosityPerMass = (luminosityPerMass * u.solLum / u.solMass).cgs
+        if luminosity:
+            self.luminosity = (luminosity * u.solLum).cgs
+        else:
+            self.luminosity = self.luminosityPerMass * self.massNewStars
 
     def __str__(self):
         return f"Region: {self.name}"
@@ -312,21 +316,25 @@ class results:
     def verify(self):
         """
         Calculates the analytic solution v = sqrt( F0 * 4pi * r / Msh - GMtot / r + C) where C is the integration constant, solved for by solving for v0.
-
-        To do: This analytic solution is for diffusion dominated systems only.
         """
-        initialForce = (self.model.eddRatio *  self.region.eddPressure * 4 * np.pi * self.model.gasColumnHeight**2).cgs
+
+        # Define the initial pressure as the eddington pressure
+        # initialPressure = self.region.eddPressure
+
+        # Define the initial pressure as the diffusion pressure
+        initialPressure = ((self.model.windToCREnergyFraction * self.region.energyDotWind) * self.model.gasColumnHeight / (con.c * self.model.meanFreePath))
+
+        initialForce = (self.model.eddRatio *  initialPressure * 4 * np.pi * self.model.gasColumnHeight**2).cgs
 
         integrationConstantDiffusion = np.power(self.model.vInitial,2).cgs - (initialForce * 4 * np.pi * self.model.gasColumnHeight / self.region.massShell).cgs + (con.G * (self.region.massNewStars + self.region.massShell)/self.model.gasColumnHeight).cgs
 
-        self.analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
+        analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
 
         advVelocity = (np.cbrt((3 * self.model.windToCREnergyFraction * self.region.energyDotWind * self.radius/(4 * self.region.massShell)))).to(u.km/u.s)
 
-
         fig, ax = plt.subplots(dpi = 200)
         ax2 = plt.twinx(ax)
-        ax.plot(self.radius, self.analyticVelocityDiffusion.to(u.km/u.s), 'k', label = "Velocity (Analytic)")
+        ax.plot(self.radius, analyticVelocityDiffusion.to(u.km/u.s), 'k', label = "Velocity (Analytic)")
         ax.plot(self.radius, self.velocity.to(u.km/u.s), 'c', label = "velocity (ODE)")
         ax.plot(self.radius, advVelocity, 'g', label = r"$(\frac{3\dot{E}_{\rm cr}R}{4M_{\rm sh}})^{1/3}$")
         ax2.plot(self.radius, self.tDiff.to(u.yr), 'r--', label = "Diffusion Time")
@@ -396,10 +404,10 @@ def getDVDR(rShell, X, region, model):
 
     dvdr = pCR * 4 * np.pi * rShell**2/(mShell*vShell) - con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
-    # Old dvdr that uses P ~ Edot * t
-    # dvdr =  model.windToCREnergyFraction*region.energyDotWind*model.coverageFraction / rShell /(region.massShell*vShell) * getMinimumTime(rShell, vShell, model.meanFreePath, region.pionTime) - G*(region.massShell + region.massNewStars)/(vShell*rShell**2)
-
     dmdr = 0
+
+    if model.radiationPressure:
+        dvdr += region.luminosity.value / con.c.cgs.value / vShell / mShell
 
     if model.sweepUpMass:
         dmdr = 4 * np.pi * region.externalGasDensity.value * (model.gasColumnHeight.value/rShell)**model.externalMassScale * rShell**2
@@ -408,38 +416,6 @@ def getDVDR(rShell, X, region, model):
     dtdr = 1/abs(vShell)
 
     return [dvdr, dpdr, dtdr, dmdr]
-    """Set of coupled ODEs giving dv/dt, dp/dt, and dr/dt
-
-    Args:
-        t (number): The time in seconds
-        X (array): An array with the current value of [vShell, pCR, rShell].
-        region (region): The current region
-        model (model): The current model
-
-    Returns:
-        array of numbers: Returns [dv/dt, dp/dt, dr/dt]
-    """
-    vShell, pCR, rShell = X
-
-    dpdt = 0
-
-    if model.energyInjection:
-        dpdt += model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3)
-
-    if model.advectionPressure:
-        dpdt -= 4 * pCR * vShell / rShell
-
-    if model.diffusionPressure:
-        dpdt -= con.c.cgs.value * model.meanFreePath.value * pCR /rShell**2
-
-    if model.streamPressure:
-        dpdt -= 0  # To-Do
-
-    dvdt = pCR * 4 * np.pi * rShell**2/region.massShell.value - con.G.cgs.value*(region.massShell.value + region.massNewStars.value)/rShell**2
-
-    drdt = vShell
-
-    return [dvdt, dpdt, drdt]
 
 def solveODE(model, region, verbose = True):
     """Returns the ODEs for a given model and region
@@ -452,7 +428,10 @@ def solveODE(model, region, verbose = True):
     Returns:
         ODESolve: A solve_ivp object.
     """
-    X0 = [model.vInitial.value, model.eddRatio * region.eddPressure.value, region.age.value, region.massShell.value]
+    initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
+    print(initialPressure)
+
+    X0 = [model.vInitial.value, initialPressure, region.age.value, region.massShell.value]
 
     rSpan = (model.gasColumnHeight.value, 1000*model.gasColumnHeight.value)
 
@@ -499,20 +478,30 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-modelOne = model("lambda CR: 0.01 pc, R0: 10 pc")
-modelTwo = model("lambda CR: 0.1 pc, R0: 10 pc", meanFreePath = 0.1)
-modelThree = model("lambda CR: 0.01 pc, R0: 50 pc", gasColumnHeight = 50)
-modelFour = model("lambda CR: 0.1 pc, R0: 50 pc", meanFreePath = 0.1, gasColumnHeight = 50)
+modelOne = model(r"$\lambda_{\rm CR}$: 0.01 pc", radiationPressure = True)
+modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True)
+modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True)
+modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True)
+modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True)
+modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True)
+modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
+modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
+modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
+modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
+modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
+modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
+# modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
+# modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$")
-regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
-regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
+regionOne = region("")
+# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
+# regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
 
-modelList = [modelOne, modelTwo, modelThree, modelFour]
-regionList = [regionOne, regionTwo, regionThree]
+modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix, modelSeven, modelEight, modelNine, modelTen, modelEleven, modelTwelve]
+regionList = [regionOne]
 
 # modelList = [modelOne]
-# regionList = [regionThree]
+# regionList = [regionOne]
 
 resultList = []
 
@@ -521,8 +510,8 @@ for currentModel in modelList:
         currentResult = results(currentModel, currentRegion)
         resultList.append(currentResult)
 
-resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "symlog")
-resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
+# resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
+# resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
 
 # for res in resultList:
 #     res.verify()
@@ -534,8 +523,122 @@ resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "symlog")
 #     res.plot("radius", "velocity", scale = "symlog")
 
 
+## energyInjection = (res.model.windToCREnergyFraction * res.region.energyDotWind / (4 * np.pi * res.radius**3 * res.velocity)).cgs
+## advectionPressure = (4 * res.pressure / res.radius).cgs
+## streamPressure = ((3*res.velocity + res.model.vAlphane) * res.pressure / ( res.radius * res.velocity)).cgs
+## diffusionPressure = (con.c.cgs * res.model.meanFreePath * res.pressure / (res.velocity * res.radius**2)).cgs
+
 # Plots
 ###############################################################################
+
+# %%
+# Plot radius and time dependent velocity
+###################################################
+
+fig, ax = plt.subplots(1, 2, dpi = 200, figsize = (10,4), facecolor = "white")
+
+ax[0].plot(resultList[0].radius, resultList[0].velocity, 'k', label = resultList[0].name)
+ax[0].plot(resultList[1].radius, resultList[1].velocity, 'b', label = resultList[1].name)
+ax[0].plot(resultList[2].radius, resultList[2].velocity, 'g', label = resultList[2].name)
+ax[0].plot(resultList[3].radius, resultList[3].velocity, 'k--')
+ax[0].plot(resultList[4].radius, resultList[4].velocity, 'b--')
+ax[0].plot(resultList[5].radius, resultList[5].velocity, 'g--')
+ax[0].plot(resultList[6].radius, resultList[6].velocity, 'r', label = resultList[6].name)
+ax[0].plot(resultList[7].radius, resultList[7].velocity, c = 'orange', label = resultList[7].name)
+ax[0].plot(resultList[8].radius, resultList[8].velocity, 'c', label = resultList[8].name)
+ax[0].plot(resultList[9].radius, resultList[9].velocity, 'r--')
+ax[0].plot(resultList[10].radius, resultList[10].velocity, c = 'orange', linestyle = "dashed")
+ax[0].plot(resultList[11].radius, resultList[11].velocity, 'c--')
+
+ax[1].plot(resultList[0].time, resultList[0].velocity, 'k', label = "No swept up mass")
+ax[1].plot(resultList[1].time, resultList[1].velocity, 'b')
+ax[1].plot(resultList[2].time, resultList[2].velocity, 'g')
+ax[1].plot(resultList[3].time, resultList[3].velocity, 'k--', label = "Swept up mass")
+ax[1].plot(resultList[4].time, resultList[4].velocity, 'b--')
+ax[1].plot(resultList[5].time, resultList[5].velocity, 'g--')
+ax[1].plot(resultList[6].time, resultList[6].velocity, 'r')
+ax[1].plot(resultList[7].time, resultList[7].velocity, c = 'orange')
+ax[1].plot(resultList[8].time, resultList[8].velocity, 'c')
+ax[1].plot(resultList[9].time, resultList[9].velocity, 'r--')
+ax[1].plot(resultList[10].time, resultList[10].velocity, c = 'orange', linestyle = "dashed")
+ax[1].plot(resultList[11].time, resultList[11].velocity, 'c--')
+
+ax[0].set_ylim(0.1, 200)
+ax[1].set_ylim(0.1, 200)
+ax[0].set_xlim(10,100)
+ax[1].set_xlim(10**6,5*10**6)
+
+ax[0].legend()
+ax[1].legend()
+
+ax[0].set_xlabel(f'Radius ({resultList[0].radius.unit})')
+ax[1].set_xlabel(f'Time ({resultList[0].time.unit})')
+ax[0].set_ylabel(f'Velocity ({resultList[0].velocity.unit})')
+
+ax[0].set_xscale('log')
+ax[1].set_xscale('log')
+ax[0].set_yscale('log')
+ax[1].set_yscale('log')
+
+# %%
+# Compare results with and without streaming
+###################################################
+
+# noStreaming = model("No Streaming", streamPressure = False)
+# streamingModel10 = model(r"$v_{\rm A} = 10 \, km/s$")
+# streamingModel30 = model(r"$v_{\rm A} = 30 \, km/s$", vAlfven = 30)
+# streamingModel100 = model(r"$v_{\rm A} = 100 \, km/s$", vAlfven = 100)
+# streamingModel500 = model(r"$v_{\rm A} = 500 \, km/s$", vAlfven = 500)
+
+# lowMassRegion = region(r"$M_{\rm sh} = 10^3 \, M_\odot$", massShell = 10**3)
+# mediumMassRegion = region(r"$M_{\rm sh} = 10^4 \, M_\odot$", massShell = 10**4)
+# highMassRegion = region(r"$M_{\rm sh} = 10^5 \, M_\odot$", massShell = 10**5)
+
+# modelList = [noStreaming, streamingModel10, streamingModel30, streamingModel100, streamingModel500]
+# regionList = [lowMassRegion, mediumMassRegion, highMassRegion]
+
+# resultList = []
+
+# for currentModel in modelList:
+#     for currentRegion in regionList:
+#         currentResult = results(currentModel, currentRegion)
+#         resultList.append(currentResult)
+
+# # resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
+# # resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
+
+# plt.figure(dpi = 200, facecolor = "White")
+
+# plt.plot(resultList[0].time, resultList[0].velocity, 'k', label = resultList[0].name)
+# plt.plot(resultList[1].time, resultList[1].velocity, 'b', label = resultList[1].name)
+# plt.plot(resultList[2].time, resultList[2].velocity, 'r', label = resultList[2].name)
+
+# plt.plot(resultList[3].time, resultList[3].velocity, 'k--', label = resultList[3].name)
+# plt.plot(resultList[4].time, resultList[4].velocity, 'b--', label = resultList[4].name)
+# plt.plot(resultList[5].time, resultList[5].velocity, 'r--', label = resultList[5].name)
+
+# plt.plot(resultList[6].time, resultList[6].velocity, 'k:', label = resultList[6].name)
+# plt.plot(resultList[7].time, resultList[7].velocity, 'b:', label = resultList[7].name)
+# plt.plot(resultList[8].time, resultList[8].velocity, 'r:', label = resultList[8].name)
+
+# plt.plot(resultList[9].time, resultList[9].velocity, 'k-.', label = resultList[9].name)
+# plt.plot(resultList[10].time, resultList[10].velocity, 'b-.', label = resultList[10].name)
+# plt.plot(resultList[11].time, resultList[11].velocity, 'r-.', label = resultList[11].name)
+
+# plt.plot(resultList[12].time, resultList[12].velocity, c = 'k', linewidth = 0.5, label = resultList[12].name)
+# plt.plot(resultList[13].time, resultList[13].velocity, c = 'b', linewidth = 0.5, label = resultList[13].name)
+# plt.plot(resultList[14].time, resultList[14].velocity, c = 'r', linewidth = 0.5, label = resultList[14].name)
+
+# plt.xscale('log')
+# plt.yscale('log')
+
+# plt.ylim(10**-1)
+
+# plt.legend(bbox_to_anchor=(1, 1))
+
+# plt.xlabel("Time (yr)")
+# plt.ylabel("Velocity (km/s)")
+
 
 # %%
 # Plot v_infinity for resultsList
