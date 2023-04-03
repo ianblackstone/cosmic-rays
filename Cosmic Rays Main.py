@@ -28,9 +28,9 @@ luminosityPerMassFiducial = 1500 # LSun/MSun The solar luminosities per mass for
 
 ageFiducial = 1 # Myr
 # luminosityFiducial = 10**8 # LSun
-radiusFiducial = 100 # pc
+radiusFiducial = 10 # pc
 radiusOldStarsFiducial = 10**4 # pc
-massShellFiducial = 10**5 # MSun
+massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 10**4 # MSun
@@ -173,6 +173,8 @@ class region:
             self.luminosity = (luminosity * u.solLum).cgs
         else:
             self.luminosity = self.luminosityPerMass * self.massNewStars
+
+        self.luminosity = (con.c * con.G * self.massShell * (self.massShell + self.massNewStars) / (10 * u.pc)**2).cgs
 
     def __str__(self):
         return f"Region: {self.name}"
@@ -428,8 +430,8 @@ def solveODE(model, region, verbose = True):
     Returns:
         ODESolve: A solve_ivp object.
     """
-    initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
-    print(initialPressure)
+    # initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
+    initialPressure = model.eddRatio * region.eddPressure.cgs.value
 
     X0 = [model.vInitial.value, initialPressure, region.age.value, region.massShell.value]
 
@@ -484,21 +486,21 @@ modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiat
 modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True)
 modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True)
 modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True)
-modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
-modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
-modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
-modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
-modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
-modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
+# modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
+# modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
+# modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
+# modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
+# modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
+# modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
 # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
 # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region("")
-# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell=10**5)
-# regionThree = region(r"MShell: $10^3$ $M_\odot$", massShell=10**3)
+regionOne = region(r"MShell: $10^4$ $M_\odot$")
+regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
+regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
 
-modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix, modelSeven, modelEight, modelNine, modelTen, modelEleven, modelTwelve]
-regionList = [regionOne]
+modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
+regionList = [regionOne,regionTwo,regionThree]
 
 # modelList = [modelOne]
 # regionList = [regionOne]
@@ -537,39 +539,51 @@ for currentModel in modelList:
 
 fig, ax = plt.subplots(1, 2, dpi = 200, figsize = (10,4), facecolor = "white")
 
-ax[0].plot(resultList[0].radius, resultList[0].velocity, 'k', label = resultList[0].name)
-ax[0].plot(resultList[1].radius, resultList[1].velocity, 'b', label = resultList[1].name)
-ax[0].plot(resultList[2].radius, resultList[2].velocity, 'g', label = resultList[2].name)
-ax[0].plot(resultList[3].radius, resultList[3].velocity, 'k--')
-ax[0].plot(resultList[4].radius, resultList[4].velocity, 'b--')
-ax[0].plot(resultList[5].radius, resultList[5].velocity, 'g--')
-ax[0].plot(resultList[6].radius, resultList[6].velocity, 'r', label = resultList[6].name)
-ax[0].plot(resultList[7].radius, resultList[7].velocity, c = 'orange', label = resultList[7].name)
-ax[0].plot(resultList[8].radius, resultList[8].velocity, 'c', label = resultList[8].name)
-ax[0].plot(resultList[9].radius, resultList[9].velocity, 'r--')
-ax[0].plot(resultList[10].radius, resultList[10].velocity, c = 'orange', linestyle = "dashed")
-ax[0].plot(resultList[11].radius, resultList[11].velocity, 'c--')
+ax[0].plot(resultList[0].radius, resultList[0].velocity, c = 'blue', label = resultList[0].name)
+ax[0].plot(resultList[1].radius, resultList[1].velocity, c = 'orange', label = resultList[1].name)
+ax[0].plot(resultList[2].radius, resultList[2].velocity, c = 'green', label = resultList[2].name)
+ax[0].plot(resultList[3].radius, resultList[3].velocity, c = 'red', label = resultList[3].name)
+ax[0].plot(resultList[4].radius, resultList[4].velocity, c = 'purple', label = resultList[4].name)
+ax[0].plot(resultList[5].radius, resultList[5].velocity, c = 'brown', label = resultList[5].name)
+ax[0].plot(resultList[6].radius, resultList[6].velocity, c = 'pink', label = resultList[6].name)
+ax[0].plot(resultList[7].radius, resultList[7].velocity, c = 'olive', label = resultList[7].name)
+ax[0].plot(resultList[8].radius, resultList[8].velocity, c = 'cyan', label = resultList[8].name)
+# ax[0].plot(resultList[9].radius, resultList[9].velocity, c = 'blue', linestyle = "dashed")
+# ax[0].plot(resultList[10].radius, resultList[10].velocity, c = 'orange', linestyle = "dashed")
+# ax[0].plot(resultList[11].radius, resultList[11].velocity, c = 'green', linestyle = "dashed")
+# ax[0].plot(resultList[12].radius, resultList[12].velocity, c = 'red', linestyle = "dashed")
+# ax[0].plot(resultList[13].radius, resultList[13].velocity, c = 'purple', linestyle = "dashed")
+# ax[0].plot(resultList[14].radius, resultList[14].velocity, c = 'brown', linestyle = "dashed")
+# ax[0].plot(resultList[15].radius, resultList[15].velocity, c = 'pink', linestyle = "dashed")
+# ax[0].plot(resultList[16].radius, resultList[16].velocity, c = 'olive', linestyle = "dashed")
+# ax[0].plot(resultList[17].radius, resultList[17].velocity, c = 'cyan', linestyle = "dashed")
 
-ax[1].plot(resultList[0].time, resultList[0].velocity, 'k', label = "No swept up mass")
-ax[1].plot(resultList[1].time, resultList[1].velocity, 'b')
-ax[1].plot(resultList[2].time, resultList[2].velocity, 'g')
-ax[1].plot(resultList[3].time, resultList[3].velocity, 'k--', label = "Swept up mass")
-ax[1].plot(resultList[4].time, resultList[4].velocity, 'b--')
-ax[1].plot(resultList[5].time, resultList[5].velocity, 'g--')
-ax[1].plot(resultList[6].time, resultList[6].velocity, 'r')
-ax[1].plot(resultList[7].time, resultList[7].velocity, c = 'orange')
-ax[1].plot(resultList[8].time, resultList[8].velocity, 'c')
-ax[1].plot(resultList[9].time, resultList[9].velocity, 'r--')
-ax[1].plot(resultList[10].time, resultList[10].velocity, c = 'orange', linestyle = "dashed")
-ax[1].plot(resultList[11].time, resultList[11].velocity, 'c--')
+ax[1].plot(resultList[0].time, resultList[0].velocity, c = 'blue', label = resultList[0].name)
+ax[1].plot(resultList[1].time, resultList[1].velocity, c = 'orange', label = resultList[1].name)
+ax[1].plot(resultList[2].time, resultList[2].velocity, c = 'green', label = resultList[2].name)
+ax[1].plot(resultList[3].time, resultList[3].velocity, c = 'red', label = resultList[3].name)
+ax[1].plot(resultList[4].time, resultList[4].velocity, c = 'purple', label = resultList[4].name)
+ax[1].plot(resultList[5].time, resultList[5].velocity, c = 'brown', label = resultList[5].name)
+ax[1].plot(resultList[6].time, resultList[6].velocity, c = 'pink', label = resultList[6].name)
+ax[1].plot(resultList[7].time, resultList[7].velocity, c = 'olive', label = resultList[7].name)
+ax[1].plot(resultList[8].time, resultList[8].velocity, c = 'cyan', label = resultList[8].name)
+# ax[1].plot(resultList[9].time, resultList[9].velocity, c = 'blue', linestyle = "dashed")
+# ax[1].plot(resultList[10].time, resultList[10].velocity, c = 'orange', linestyle = "dashed")
+# ax[1].plot(resultList[11].time, resultList[11].velocity, c = 'green', linestyle = "dashed")
+# ax[1].plot(resultList[12].time, resultList[12].velocity, c = 'red', linestyle = "dashed")
+# ax[1].plot(resultList[13].time, resultList[13].velocity, c = 'purple', linestyle = "dashed")
+# ax[1].plot(resultList[14].time, resultList[14].velocity, c = 'brown', linestyle = "dashed")
+# ax[1].plot(resultList[15].time, resultList[15].velocity, c = 'pink', linestyle = "dashed")
+# ax[1].plot(resultList[16].time, resultList[16].velocity, c = 'olive', linestyle = "dashed")
+# ax[1].plot(resultList[17].time, resultList[17].velocity, c = 'cyan', linestyle = "dashed")
 
 ax[0].set_ylim(0.1, 200)
 ax[1].set_ylim(0.1, 200)
-ax[0].set_xlim(10,100)
-ax[1].set_xlim(10**6,5*10**6)
+# ax[0].set_xlim(10,100)
+# ax[1].set_xlim(10**6,5*10**6)
 
 ax[0].legend()
-ax[1].legend()
+# ax[1].legend()
 
 ax[0].set_xlabel(f'Radius ({resultList[0].radius.unit})')
 ax[1].set_xlabel(f'Time ({resultList[0].time.unit})')
