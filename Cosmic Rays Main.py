@@ -30,8 +30,8 @@ ageFiducial = 1 # Myr
 # luminosityFiducial = 10**8 # LSun
 radiusFiducial = 10 # pc
 radiusOldStarsFiducial = 10**4 # pc
-massShellFiducial = 10**4 # MSun
-massNewStarsFiducial = 10**4 # MSun
+massShellFiducial = 10**2 # MSun
+massNewStarsFiducial = 10**2 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 10**4 # MSun
 externalGasDensityFiducial = 1 # protons/cm^3
@@ -594,6 +594,72 @@ ax[1].set_xscale('log')
 ax[0].set_yscale('log')
 ax[1].set_yscale('log')
 
+# %%
+# Rough code for comparing pressure magnitudes
+###################################################
+r = np.logspace(0,3,500) * u.pc
+
+lam001 = 0.01 * u.pc
+lam01 = 0.1 * u.pc
+
+mshell2 = 10**2 * u.Msun
+mshell3 = 10**3 * u.Msun
+
+tau2 = 0.1 * u.pc**2 * mshell2 / u.Msun / r**2
+tau3 = 0.1 * u.pc**2 * mshell3 / u.Msun / r**2
+
+mstar = 10**2 * u.Msun
+
+lum = 1500 * mstar * u.Lsun / u.Msun
+
+grav2 = con.G * mshell2 * (mshell2 + mstar) / r**2
+grav3 = con.G * mshell3 * (mshell3 + mstar) / r**2
+
+eps = 2*10**-5
+
+wind =  lum/con.c
+
+CR001 = 3 * eps * r/ lam001 * wind
+CR01  = 3 * eps * r/ lam01 * wind
+
+rad2 = (1-np.exp(-tau2)) * wind
+rad3 = (1-np.exp(-tau2)) * wind
+
+plt.figure(dpi = 200, facecolor = 'white')
+
+plt.plot(r, rad2/grav2, 'k', label = "Radiation")
+plt.plot(r, CR001/grav2, 'b', label = r"CR ($\lambda = 0.01$ pc)")
+plt.plot(r, CR01/grav2, 'b--', label = r"CR ($\lambda = 0.1$ pc)")
+plt.plot(r, wind/grav2, 'r', label = "Wind")
+
+plt.xscale('log')
+plt.yscale('log')
+
+plt.xlabel('Radius (pc)')
+plt.ylabel(r'Force / $GMM_{\rm tot}/r^2$')
+
+plt.title(r'Force / Gravity for $M_{\rm sh} = 10^2\,M_\odot$')
+plt.legend()
+
+plt.show()
+
+plt.figure(dpi = 200, facecolor = 'white')
+
+plt.plot(r, rad3/grav3, 'k', label = "Radiation")
+plt.plot(r, CR001/grav3, 'b', label = r"CR ($\lambda = 0.01$ pc)")
+plt.plot(r, CR01/grav3, 'b--', label = r"CR ($\lambda = 0.1$ pc)")
+plt.plot(r, wind/grav3, 'r', label = "Wind")
+
+plt.xscale('log')
+plt.yscale('log')
+
+plt.xlabel('Radius (pc)')
+plt.ylabel(r'Force / $GMM_{\rm tot}/r^2$')
+
+plt.title(r'Force / Gravity for $M_{\rm sh} = 10^3\,M_\odot$')
+plt.legend()
+
+plt.show()
 # %%
 # Compare results with and without streaming
 ###################################################
