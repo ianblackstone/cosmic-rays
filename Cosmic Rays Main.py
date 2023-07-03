@@ -25,6 +25,7 @@ pionLifetimeFiducial = 5*10**7 # yr
 vAlfvenFiducial = 10 # km/s
 externalMassScaleFiducial = 0 # External masss density will scale as (r0/r)^x where this is x
 luminosityPerMassFiducial = 1500 # LSun/MSun The solar luminosities per mass for a star cluster.
+tauScaleFiducial =  0.1 # pc^2 / MSun
 
 ageFiducial = 1 # Myr
 # luminosityFiducial = 10**8 # LSun
@@ -41,9 +42,10 @@ energyInjectionFiducial = True
 advectionPressureFiducial = True
 diffusionPressureFiducial = True
 pionPressureFiducial = True
-streamPressureFiducial = False
+streamPressureFiducial = True
 sweepUpMassFiducial = False
 radiationPressureFiducial = False
+windPressureFiducial = False
 
 ###############################################################################
 # Code for calculating the cosmic ray pressure on regions of a galaxy.
@@ -75,7 +77,9 @@ class model:
                 streamPressure = streamPressureFiducial,
                 sweepUpMass = sweepUpMassFiducial,
                 radiationPressure = radiationPressureFiducial,
-                externalMassScale = externalMassScaleFiducial):
+                windPressure = windPressureFiducial,
+                externalMassScale = externalMassScaleFiducial,
+                tauScale = tauScaleFiducial):
         """A model object contains the base data and parameters not related to region data for calculations.
 
         Args:
@@ -89,6 +93,7 @@ class model:
             coverageFraction (Float, optional): Shell coverage fraction. Defaults to coverageFractionFiducial.
             eddRatio (Float, optional): The initial Eddington ratio. Defaults to eddRatioFiducial.
             pionLifetime (Float, optional): The pion lifetime scale. Input in yr, will be converted to s and a unit label added. Defaults to pionLifetimeFiducial
+            tauScale (Float, optional): The mean free path for photons in pc. Defaults to tauScaleFiducial.
             vAlphane (Floar, optional): The Alphane velocity of the model. Given in km/s, will be converted to cgs. Defaults to vAlphaneFiducial.
             energyInjection (Boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
             advectionPressure (Boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
@@ -96,8 +101,9 @@ class model:
             pionPressure (Boolean, optional): Boolean to enable pion decay in the model. Defaults to pionPressureFiducial.
             streamPressure (Boolean, optional): Boolean to enable streaming in the model. Defaults to streamPressureFiducial.
             sweepUpMass (Boolean, optional): Boolean to enable the sweeping up of additional mass in the model. Defaults to sweepUpMassFiducial.
+            externalMassScale (Float, optional): The scale factor for externally swept up mass. Defaults to externalMassScaleFiducial.
             radiationPressure (Boolean, optional): Boolean to enable radiation pressure in the model. Defaults to radiationPressureFiducial.
-            externalMassScale (Float, optional): The scale factor for externally swept up mass. Defaults to externalMassScaleFiducial
+            windPressure (Boolean, optional): Boolean to enable wind pressure in the model. Defaults to windPressureFiducial.
         """
         self.name = name
         self.meanFreePath = (meanFreePath * u.pc).cgs
@@ -107,6 +113,7 @@ class model:
         self.coverageFraction = coverageFraction
         self.eddRatio = eddRatio
         self.pionLifetime = (pionLifetime * u.yr).cgs
+        self.tauScale = (tauScale * u.pc**2 / u.Msun).cgs
         self.vAlphane = (vAlfven * u.km/u.s).cgs
         self.vInitial = (vInitial * u.km / u.s).cgs
         self.tInitial = (tInitial * u.yr).cgs
@@ -118,6 +125,8 @@ class model:
         self.sweepUpMass = sweepUpMass
         self.externalMassScale = externalMassScale
         self.radiationPressure = radiationPressure
+        self.windPressure = windPressure
+        
 
     def __str__(self):
         return f"Model: {self.name}"
@@ -155,6 +164,7 @@ class region:
             electronDensity (Float): The electron number density in n/cm^3. Not currently used but important for pion losses.
             pionTime (Float): The pion timescale in s. Not currently used.
             eddPressure (Float): The Eddington pressure for the initial region conditions, in Bayres.
+            tauInitial (float): The initial optical depth, calculated as (0.1 pc)^2  * massShell / r^2. This is calculated when given a model.
         """
         self.name = name
         self.age = (age * u.Myr).cgs
@@ -175,6 +185,9 @@ class region:
             self.luminosity = self.luminosityPerMass * self.massNewStars
 
         self.luminosity = (con.c * con.G * self.massShell * (self.massShell + self.massNewStars) / (10 * u.pc)**2).cgs
+
+    def calculateTau(self, model):
+        self.tauInitial = (model.tauScale * self.massShell / model.gasColumnHeight**2).cgs
 
     def __str__(self):
         return f"Region: {self.name}"
@@ -223,7 +236,7 @@ class results:
         self.energyCR = (self.pressure * 4 * np.pi * self.radius**3).cgs
         self.gammaLuminosity = (1 / 3 * self.energyCR / self.tPion).cgs
 
-        self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value, self.massShell.value], self.region, self.model)
+        self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value, self.massShell.value], self.region, self.model, verbose = True)
 
         self.tauPi = (self.radius * (self.region.externalGasDensity / con.m_p * u.cm**3)/(con.c * self.model.pionLifetime)).cgs
         self.tauScatt = (self.radius/self.model.meanFreePath).cgs
@@ -376,7 +389,7 @@ def getMinimumTime(rShell, vShell, model):
 
     return min(tDiff, tAdv, pionTime)
 
-def getDVDR(rShell, X, region, model):
+def getDVDR(rShell, X, region, model, verbose = False):
     """Set of coupled ODEs giving dv/dr, dp/dr, and dt/dr
 
     Args:
@@ -390,30 +403,81 @@ def getDVDR(rShell, X, region, model):
     """
     vShell, pCR, t, mShell = X
 
-    dpdr = 0
+    if verbose:
+        dpdr = type('DPDR', (), {})()
+    else:
+        dpdr = 0
 
     if model.energyInjection:
-        dpdr += model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
+        energy = model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
 
+        if verbose:
+            dpdr.energyInjection = energy * u.dyn / u.cm
+        else:
+            dpdr += energy
+        
     if model.advectionPressure:
-        dpdr -= 4 * pCR / rShell
+        advection = 4 * pCR / rShell
+
+        if verbose:
+            dpdr.advection = advection * u.dyn / u.cm
+        else:
+            dpdr -= advection
 
     if model.diffusionPressure:
-        dpdr -= con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
+        diffusion = con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
+        if verbose:
+            dpdr.diffusion = diffusion * u.dyn / u.cm
+        else:
+            dpdr -= diffusion
 
     if model.streamPressure:
-        dpdr -= (3*vShell + model.vAlphane.value) * pCR / ( rShell * vShell)
+        streaming = (3*vShell + model.vAlphane.value) * pCR / ( rShell * vShell)
+        if verbose:
+            dpdr.streaming = streaming * u.dyn / u.cm
+        else:
+            dpdr -= streaming
 
-    dvdr = pCR * 4 * np.pi * rShell**2/(mShell*vShell) - con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
+    if verbose:
+        dvdr = type('DVDR', (), {})()
+    else:
+        dvdr = 0
+
+    dvdrCR = pCR * 4 * np.pi * rShell**2/(mShell*vShell)
+    dvdrGrav = -con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
+
+    if verbose:
+        dvdr.CR = dvdrCR / u.s
+        dvdr.gravity = dvdrGrav
+    else:
+        dvdr = dvdrCR - dvdrGrav
 
     dmdr = 0
 
     if model.radiationPressure:
-        dvdr += region.luminosity.value / con.c.cgs.value / vShell / mShell
+        radiation = region.luminosity.value / con.c.cgs.value / vShell / mShell * (1 - np.exp(-region.tauInitial * (model.gasColumnHeight.value / rShell)**2))
+
+        if verbose:
+            dvdr.radiation = radiation / u.s
+        else:
+            dvdr += radiation
+
+    if model.windPressure:
+        wind = region.luminosity.value / con.c.cgs.value / vShell / mShell
+        if verbose:
+            dvdr.wind = wind / u.s
+        else:
+            dvdr += wind
 
     if model.sweepUpMass:
         dmdr = 4 * np.pi * region.externalGasDensity.value * (model.gasColumnHeight.value/rShell)**model.externalMassScale * rShell**2
-        dvdr -= vShell * dmdr / mShell
+
+        mass = vShell * dmdr / mShell
+
+        if verbose:
+            dvdr.mass = mass / u.s
+        else:
+            dvdr -= mass
 
     dtdr = 1/abs(vShell)
 
@@ -432,6 +496,9 @@ def solveODE(model, region, verbose = True):
     """
     # initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
     initialPressure = model.eddRatio * region.eddPressure.cgs.value
+
+    # Need to set the initial tau to allow for proper radiation pressure calculation.
+    region.calculateTau(model)
 
     X0 = [model.vInitial.value, initialPressure, region.age.value, region.massShell.value]
 
@@ -480,12 +547,12 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-modelOne = model(r"$\lambda_{\rm CR}$: 0.01 pc", radiationPressure = True)
-modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True)
-modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True)
-modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True)
-modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True)
-modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True)
+modelOne = model(r"$\lambda_{\rm CR}$: 0.01 pc", radiationPressure = True, windPressure = True)
+modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True, windPressure = True)
+modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
+modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
+modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
+modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
 # modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
 # modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
 # modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
@@ -537,129 +604,129 @@ for currentModel in modelList:
 # Plot radius and time dependent velocity
 ###################################################
 
-fig, ax = plt.subplots(1, 2, dpi = 200, figsize = (10,4), facecolor = "white")
+# fig, ax = plt.subplots(1, 2, dpi = 200, figsize = (10,4), facecolor = "white")
 
-ax[0].plot(resultList[0].radius, resultList[0].velocity, c = 'blue', label = resultList[0].name)
-ax[0].plot(resultList[1].radius, resultList[1].velocity, c = 'orange', label = resultList[1].name)
-ax[0].plot(resultList[2].radius, resultList[2].velocity, c = 'green', label = resultList[2].name)
-ax[0].plot(resultList[3].radius, resultList[3].velocity, c = 'red', label = resultList[3].name)
-ax[0].plot(resultList[4].radius, resultList[4].velocity, c = 'purple', label = resultList[4].name)
-ax[0].plot(resultList[5].radius, resultList[5].velocity, c = 'brown', label = resultList[5].name)
-ax[0].plot(resultList[6].radius, resultList[6].velocity, c = 'pink', label = resultList[6].name)
-ax[0].plot(resultList[7].radius, resultList[7].velocity, c = 'olive', label = resultList[7].name)
-ax[0].plot(resultList[8].radius, resultList[8].velocity, c = 'cyan', label = resultList[8].name)
-# ax[0].plot(resultList[9].radius, resultList[9].velocity, c = 'blue', linestyle = "dashed")
-# ax[0].plot(resultList[10].radius, resultList[10].velocity, c = 'orange', linestyle = "dashed")
-# ax[0].plot(resultList[11].radius, resultList[11].velocity, c = 'green', linestyle = "dashed")
-# ax[0].plot(resultList[12].radius, resultList[12].velocity, c = 'red', linestyle = "dashed")
-# ax[0].plot(resultList[13].radius, resultList[13].velocity, c = 'purple', linestyle = "dashed")
-# ax[0].plot(resultList[14].radius, resultList[14].velocity, c = 'brown', linestyle = "dashed")
-# ax[0].plot(resultList[15].radius, resultList[15].velocity, c = 'pink', linestyle = "dashed")
-# ax[0].plot(resultList[16].radius, resultList[16].velocity, c = 'olive', linestyle = "dashed")
-# ax[0].plot(resultList[17].radius, resultList[17].velocity, c = 'cyan', linestyle = "dashed")
+# ax[0].plot(resultList[0].radius, resultList[0].velocity, c = 'blue', label = resultList[0].name)
+# ax[0].plot(resultList[1].radius, resultList[1].velocity, c = 'orange', label = resultList[1].name)
+# ax[0].plot(resultList[2].radius, resultList[2].velocity, c = 'green', label = resultList[2].name)
+# ax[0].plot(resultList[3].radius, resultList[3].velocity, c = 'red', label = resultList[3].name)
+# ax[0].plot(resultList[4].radius, resultList[4].velocity, c = 'purple', label = resultList[4].name)
+# ax[0].plot(resultList[5].radius, resultList[5].velocity, c = 'brown', label = resultList[5].name)
+# ax[0].plot(resultList[6].radius, resultList[6].velocity, c = 'pink', label = resultList[6].name)
+# ax[0].plot(resultList[7].radius, resultList[7].velocity, c = 'olive', label = resultList[7].name)
+# ax[0].plot(resultList[8].radius, resultList[8].velocity, c = 'cyan', label = resultList[8].name)
+# # ax[0].plot(resultList[9].radius, resultList[9].velocity, c = 'blue', linestyle = "dashed")
+# # ax[0].plot(resultList[10].radius, resultList[10].velocity, c = 'orange', linestyle = "dashed")
+# # ax[0].plot(resultList[11].radius, resultList[11].velocity, c = 'green', linestyle = "dashed")
+# # ax[0].plot(resultList[12].radius, resultList[12].velocity, c = 'red', linestyle = "dashed")
+# # ax[0].plot(resultList[13].radius, resultList[13].velocity, c = 'purple', linestyle = "dashed")
+# # ax[0].plot(resultList[14].radius, resultList[14].velocity, c = 'brown', linestyle = "dashed")
+# # ax[0].plot(resultList[15].radius, resultList[15].velocity, c = 'pink', linestyle = "dashed")
+# # ax[0].plot(resultList[16].radius, resultList[16].velocity, c = 'olive', linestyle = "dashed")
+# # ax[0].plot(resultList[17].radius, resultList[17].velocity, c = 'cyan', linestyle = "dashed")
 
-ax[1].plot(resultList[0].time, resultList[0].velocity, c = 'blue', label = resultList[0].name)
-ax[1].plot(resultList[1].time, resultList[1].velocity, c = 'orange', label = resultList[1].name)
-ax[1].plot(resultList[2].time, resultList[2].velocity, c = 'green', label = resultList[2].name)
-ax[1].plot(resultList[3].time, resultList[3].velocity, c = 'red', label = resultList[3].name)
-ax[1].plot(resultList[4].time, resultList[4].velocity, c = 'purple', label = resultList[4].name)
-ax[1].plot(resultList[5].time, resultList[5].velocity, c = 'brown', label = resultList[5].name)
-ax[1].plot(resultList[6].time, resultList[6].velocity, c = 'pink', label = resultList[6].name)
-ax[1].plot(resultList[7].time, resultList[7].velocity, c = 'olive', label = resultList[7].name)
-ax[1].plot(resultList[8].time, resultList[8].velocity, c = 'cyan', label = resultList[8].name)
-# ax[1].plot(resultList[9].time, resultList[9].velocity, c = 'blue', linestyle = "dashed")
-# ax[1].plot(resultList[10].time, resultList[10].velocity, c = 'orange', linestyle = "dashed")
-# ax[1].plot(resultList[11].time, resultList[11].velocity, c = 'green', linestyle = "dashed")
-# ax[1].plot(resultList[12].time, resultList[12].velocity, c = 'red', linestyle = "dashed")
-# ax[1].plot(resultList[13].time, resultList[13].velocity, c = 'purple', linestyle = "dashed")
-# ax[1].plot(resultList[14].time, resultList[14].velocity, c = 'brown', linestyle = "dashed")
-# ax[1].plot(resultList[15].time, resultList[15].velocity, c = 'pink', linestyle = "dashed")
-# ax[1].plot(resultList[16].time, resultList[16].velocity, c = 'olive', linestyle = "dashed")
-# ax[1].plot(resultList[17].time, resultList[17].velocity, c = 'cyan', linestyle = "dashed")
+# ax[1].plot(resultList[0].time, resultList[0].velocity, c = 'blue', label = resultList[0].name)
+# ax[1].plot(resultList[1].time, resultList[1].velocity, c = 'orange', label = resultList[1].name)
+# ax[1].plot(resultList[2].time, resultList[2].velocity, c = 'green', label = resultList[2].name)
+# ax[1].plot(resultList[3].time, resultList[3].velocity, c = 'red', label = resultList[3].name)
+# ax[1].plot(resultList[4].time, resultList[4].velocity, c = 'purple', label = resultList[4].name)
+# ax[1].plot(resultList[5].time, resultList[5].velocity, c = 'brown', label = resultList[5].name)
+# ax[1].plot(resultList[6].time, resultList[6].velocity, c = 'pink', label = resultList[6].name)
+# ax[1].plot(resultList[7].time, resultList[7].velocity, c = 'olive', label = resultList[7].name)
+# ax[1].plot(resultList[8].time, resultList[8].velocity, c = 'cyan', label = resultList[8].name)
+# # ax[1].plot(resultList[9].time, resultList[9].velocity, c = 'blue', linestyle = "dashed")
+# # ax[1].plot(resultList[10].time, resultList[10].velocity, c = 'orange', linestyle = "dashed")
+# # ax[1].plot(resultList[11].time, resultList[11].velocity, c = 'green', linestyle = "dashed")
+# # ax[1].plot(resultList[12].time, resultList[12].velocity, c = 'red', linestyle = "dashed")
+# # ax[1].plot(resultList[13].time, resultList[13].velocity, c = 'purple', linestyle = "dashed")
+# # ax[1].plot(resultList[14].time, resultList[14].velocity, c = 'brown', linestyle = "dashed")
+# # ax[1].plot(resultList[15].time, resultList[15].velocity, c = 'pink', linestyle = "dashed")
+# # ax[1].plot(resultList[16].time, resultList[16].velocity, c = 'olive', linestyle = "dashed")
+# # ax[1].plot(resultList[17].time, resultList[17].velocity, c = 'cyan', linestyle = "dashed")
 
-ax[0].set_ylim(0.1, 200)
-ax[1].set_ylim(0.1, 200)
-# ax[0].set_xlim(10,100)
-# ax[1].set_xlim(10**6,5*10**6)
+# ax[0].set_ylim(0.1, 200)
+# ax[1].set_ylim(0.1, 200)
+# # ax[0].set_xlim(10,100)
+# # ax[1].set_xlim(10**6,5*10**6)
 
-ax[0].legend()
-# ax[1].legend()
+# ax[0].legend()
+# # ax[1].legend()
 
-ax[0].set_xlabel(f'Radius ({resultList[0].radius.unit})')
-ax[1].set_xlabel(f'Time ({resultList[0].time.unit})')
-ax[0].set_ylabel(f'Velocity ({resultList[0].velocity.unit})')
+# ax[0].set_xlabel(f'Radius ({resultList[0].radius.unit})')
+# ax[1].set_xlabel(f'Time ({resultList[0].time.unit})')
+# ax[0].set_ylabel(f'Velocity ({resultList[0].velocity.unit})')
 
-ax[0].set_xscale('log')
-ax[1].set_xscale('log')
-ax[0].set_yscale('log')
-ax[1].set_yscale('log')
+# ax[0].set_xscale('log')
+# ax[1].set_xscale('log')
+# ax[0].set_yscale('log')
+# ax[1].set_yscale('log')
 
 # %%
 # Rough code for comparing pressure magnitudes
 ###################################################
-r = np.logspace(0,3,500) * u.pc
+# r = np.logspace(0,3,500) * u.pc
 
-lam001 = 0.01 * u.pc
-lam01 = 0.1 * u.pc
+# lam001 = 0.01 * u.pc
+# lam01 = 0.1 * u.pc
 
-mshell2 = 10**2 * u.Msun
-mshell3 = 10**3 * u.Msun
+# mshell2 = 10**2 * u.Msun
+# mshell3 = 10**3 * u.Msun
 
-tau2 = 0.1 * u.pc**2 * mshell2 / u.Msun / r**2
-tau3 = 0.1 * u.pc**2 * mshell3 / u.Msun / r**2
+# tau2 = 0.1 * u.pc**2 * mshell2 / u.Msun / r**2
+# tau3 = 0.1 * u.pc**2 * mshell3 / u.Msun / r**2
 
-mstar = 10**2 * u.Msun
+# mstar = 10**2 * u.Msun
 
-lum = 1500 * mstar * u.Lsun / u.Msun
+# lum = 1500 * mstar * u.Lsun / u.Msun
 
-grav2 = con.G * mshell2 * (mshell2 + mstar) / r**2
-grav3 = con.G * mshell3 * (mshell3 + mstar) / r**2
+# grav2 = con.G * mshell2 * (mshell2 + mstar) / r**2
+# grav3 = con.G * mshell3 * (mshell3 + mstar) / r**2
 
-eps = 2*10**-5
+# eps = 2*10**-5
 
-wind =  lum/con.c
+# wind =  lum/con.c
 
-CR001 = 3 * eps * r/ lam001 * wind
-CR01  = 3 * eps * r/ lam01 * wind
+# CR001 = 3 * eps * r/ lam001 * wind
+# CR01  = 3 * eps * r/ lam01 * wind
 
-rad2 = (1-np.exp(-tau2)) * wind
-rad3 = (1-np.exp(-tau2)) * wind
+# rad2 = (1-np.exp(-tau2)) * wind
+# rad3 = (1-np.exp(-tau3)) * wind
 
-plt.figure(dpi = 200, facecolor = 'white')
+# plt.figure(dpi = 200, facecolor = 'white')
 
-plt.plot(r, rad2/grav2, 'k', label = "Radiation")
-plt.plot(r, CR001/grav2, 'b', label = r"CR ($\lambda = 0.01$ pc)")
-plt.plot(r, CR01/grav2, 'b--', label = r"CR ($\lambda = 0.1$ pc)")
-plt.plot(r, wind/grav2, 'r', label = "Wind")
+# plt.plot(r, rad2/grav2, 'k', label = "Radiation")
+# plt.plot(r, CR001/grav2, 'b', label = r"CR ($\lambda = 0.01$ pc)")
+# plt.plot(r, CR01/grav2, 'b--', label = r"CR ($\lambda = 0.1$ pc)")
+# plt.plot(r, wind/grav2, 'r', label = "Wind")
 
-plt.xscale('log')
-plt.yscale('log')
+# plt.xscale('log')
+# plt.yscale('log')
 
-plt.xlabel('Radius (pc)')
-plt.ylabel(r'Force / $GMM_{\rm tot}/r^2$')
+# plt.xlabel('Radius (pc)')
+# plt.ylabel(r'Force / $GMM_{\rm tot}/r^2$')
 
-plt.title(r'Force / Gravity for $M_{\rm sh} = 10^2\,M_\odot$')
-plt.legend()
+# plt.title(r'Force / Gravity for $M_{\rm sh} = 10^2\,M_\odot$')
+# plt.legend()
 
-plt.show()
+# plt.show()
 
-plt.figure(dpi = 200, facecolor = 'white')
+# plt.figure(dpi = 200, facecolor = 'white')
 
-plt.plot(r, rad3/grav3, 'k', label = "Radiation")
-plt.plot(r, CR001/grav3, 'b', label = r"CR ($\lambda = 0.01$ pc)")
-plt.plot(r, CR01/grav3, 'b--', label = r"CR ($\lambda = 0.1$ pc)")
-plt.plot(r, wind/grav3, 'r', label = "Wind")
+# plt.plot(r, rad3/grav3, 'k', label = "Radiation")
+# plt.plot(r, CR001/grav3, 'b', label = r"CR ($\lambda = 0.01$ pc)")
+# plt.plot(r, CR01/grav3, 'b--', label = r"CR ($\lambda = 0.1$ pc)")
+# plt.plot(r, wind/grav3, 'r', label = "Wind")
 
-plt.xscale('log')
-plt.yscale('log')
+# plt.xscale('log')
+# plt.yscale('log')
 
-plt.xlabel('Radius (pc)')
-plt.ylabel(r'Force / $GMM_{\rm tot}/r^2$')
+# plt.xlabel('Radius (pc)')
+# plt.ylabel(r'Force / $GMM_{\rm tot}/r^2$')
 
-plt.title(r'Force / Gravity for $M_{\rm sh} = 10^3\,M_\odot$')
-plt.legend()
+# plt.title(r'Force / Gravity for $M_{\rm sh} = 10^3\,M_\odot$')
+# plt.legend()
 
-plt.show()
+# plt.show()
 # %%
 # Compare results with and without streaming
 ###################################################
