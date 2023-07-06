@@ -94,7 +94,7 @@ class model:
             eddRatio (Float, optional): The initial Eddington ratio. Defaults to eddRatioFiducial.
             pionLifetime (Float, optional): The pion lifetime scale. Input in yr, will be converted to s and a unit label added. Defaults to pionLifetimeFiducial
             tauScale (Float, optional): The mean free path for photons in pc. Defaults to tauScaleFiducial.
-            vAlphane (Floar, optional): The Alphane velocity of the model. Given in km/s, will be converted to cgs. Defaults to vAlphaneFiducial.
+            vAlfven (Float, optional): The Alfven velocity of the model. Given in km/s, will be converted to cgs. Defaults to vAlfvenFiducial.
             energyInjection (Boolean, optional): Boolean to enable energy injection in the model. Defaults to energyInjectionFiducial.
             advectionPressure (Boolean, optional): Boolean to enable advection in the model. Defaults to advectionPressureFiducial.
             diffusionPressure (Boolean, optional): Boolean to enable diffusion in the model. Defaults to diffusionPressureFiducial.
@@ -114,7 +114,7 @@ class model:
         self.eddRatio = eddRatio
         self.pionLifetime = (pionLifetime * u.yr).cgs
         self.tauScale = (tauScale * u.pc**2 / u.Msun).cgs
-        self.vAlphane = (vAlfven * u.km/u.s).cgs
+        self.vAlfven = (vAlfven * u.km/u.s).cgs
         self.vInitial = (vInitial * u.km / u.s).cgs
         self.tInitial = (tInitial * u.yr).cgs
         self.energyInjection = energyInjection
@@ -232,11 +232,18 @@ class results:
         self.tPion = self.model.pionLifetime / self.innerShockNumberDensity / u.cm**3
         self.tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).cgs
         self.tAdv = (self.radius/self.velocity).cgs
-        self.tStream = (self.radius/self.model.vAlphane).cgs
+        self.tStream = (self.radius/self.model.vAlfven).cgs
         self.energyCR = (self.pressure * 4 * np.pi * self.radius**3).cgs
         self.gammaLuminosity = (1 / 3 * self.energyCR / self.tPion).cgs
 
-        self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.time.value, [self.velocity.value, self.pressure.value, self.radius.value, self.massShell.value], self.region, self.model, verbose = True)
+        self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.radius.cgs.value, [self.velocity.cgs.value, self.pressure.cgs.value, self.time.cgs.value, self.massShell.cgs.value], self.region, self.model, verbose = True)
+
+        dpdrConversion = 4 * np.pi * self.radius**2/(self.massShell*self.velocity) * u.pc
+
+        self.dvdr.diffusion = (np.cumsum(self.dpdr.diffusion) * dpdrConversion).cgs
+        self.dvdr.advection = (np.cumsum(self.dpdr.advection) * dpdrConversion).cgs
+        self.dvdr.streaming = (np.cumsum(self.dpdr.streaming) * dpdrConversion).cgs
+        self.dvdr.energyInjection = (np.cumsum(self.dpdr.energyInjection) * dpdrConversion).cgs
 
         self.tauPi = (self.radius * (self.region.externalGasDensity / con.m_p * u.cm**3)/(con.c * self.model.pionLifetime)).cgs
         self.tauScatt = (self.radius/self.model.meanFreePath).cgs
@@ -412,7 +419,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
         energy = model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
 
         if verbose:
-            dpdr.energyInjection = energy * u.dyn / u.cm
+            dpdr.energyInjection = energy * u.Ba / u.cm
         else:
             dpdr += energy
         
@@ -420,21 +427,21 @@ def getDVDR(rShell, X, region, model, verbose = False):
         advection = 4 * pCR / rShell
 
         if verbose:
-            dpdr.advection = advection * u.dyn / u.cm
+            dpdr.advection = advection * u.Ba / u.cm
         else:
             dpdr -= advection
 
     if model.diffusionPressure:
         diffusion = con.c.cgs.value * model.meanFreePath.value * pCR / (vShell * rShell**2)
         if verbose:
-            dpdr.diffusion = diffusion * u.dyn / u.cm
+            dpdr.diffusion = diffusion * u.Ba / u.cm
         else:
             dpdr -= diffusion
 
     if model.streamPressure:
-        streaming = (3*vShell + model.vAlphane.value) * pCR / ( rShell * vShell)
+        streaming = (3*vShell + model.vAlfven.value) * pCR / ( rShell * vShell)
         if verbose:
-            dpdr.streaming = streaming * u.dyn / u.cm
+            dpdr.streaming = streaming * u.Ba / u.cm
         else:
             dpdr -= streaming
 
@@ -448,14 +455,14 @@ def getDVDR(rShell, X, region, model, verbose = False):
 
     if verbose:
         dvdr.CR = dvdrCR / u.s
-        dvdr.gravity = dvdrGrav
+        dvdr.gravity = dvdrGrav / u.s
     else:
         dvdr = dvdrCR - dvdrGrav
 
     dmdr = 0
 
     if model.radiationPressure:
-        radiation = region.luminosity.value / con.c.cgs.value / vShell / mShell * (1 - np.exp(-region.tauInitial * (model.gasColumnHeight.value / rShell)**2))
+        radiation = region.luminosity.value / con.c.cgs.value / vShell / mShell * (1 - np.exp(-region.tauInitial * (model.gasColumnHeight.cgs.value / rShell)**2))
 
         if verbose:
             dvdr.radiation = radiation / u.s
@@ -547,7 +554,7 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-modelOne = model(r"$\lambda_{\rm CR}$: 0.01 pc", radiationPressure = True, windPressure = True)
+modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
 modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True, windPressure = True)
 modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
 modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
@@ -562,15 +569,15 @@ modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpM
 # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
 # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$")
+regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**6, massNewStars = 10**4)
 regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
 regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
 
 modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
 regionList = [regionOne,regionTwo,regionThree]
 
-# modelList = [modelOne]
-# regionList = [regionOne]
+modelList = [modelOne]
+regionList = [regionOne]
 
 resultList = []
 
@@ -594,7 +601,7 @@ for currentModel in modelList:
 
 ## energyInjection = (res.model.windToCREnergyFraction * res.region.energyDotWind / (4 * np.pi * res.radius**3 * res.velocity)).cgs
 ## advectionPressure = (4 * res.pressure / res.radius).cgs
-## streamPressure = ((3*res.velocity + res.model.vAlphane) * res.pressure / ( res.radius * res.velocity)).cgs
+## streamPressure = ((3*res.velocity + res.model.vAlfven) * res.pressure / ( res.radius * res.velocity)).cgs
 ## diffusionPressure = (con.c.cgs * res.model.meanFreePath * res.pressure / (res.velocity * res.radius**2)).cgs
 
 # Plots
