@@ -8,6 +8,7 @@ from scipy.optimize import fsolve
 from astropy import constants as con
 from astropy import units as u
 from matplotlib.collections import LineCollection
+from hoki import load
 
 
 # %%
@@ -46,6 +47,21 @@ streamPressureFiducial = True
 sweepUpMassFiducial = False
 radiationPressureFiducial = False
 windPressureFiducial = False
+
+# alphaB recombination constant, since this is not included in astropy.
+alphaB = 2 * 10**-13 * u.cm**3 / u.s
+
+# BPASS file locations
+ionFile = 'bpass/ionizing-bin-imf135_300.a+02.z020.dat'
+colorsFile = 'bpass/colours-bin-imf135_300.a+02.z020.dat'
+spectraFile = 'bpass/spectra-bin-imf135_300.a+02.z020.dat'
+yieldsFile = 'bpass/yields-bin-imf135_300.z020.dat'
+
+# Load BPASS data from files, these will be put in a more usable class for integration with the code.
+ionData = load.model_output(ionFile)
+colorsData = load.model_output(colorsFile)
+spectraData = load.model_output(spectraFile)
+yieldsData = load.model_output(yieldsFile)
 
 ###############################################################################
 # Code for calculating the cosmic ray pressure on regions of a galaxy.
@@ -375,6 +391,36 @@ class results:
         ax.set_ylabel(f"Velocity ({self.velocity.unit})")
         ax2.set_ylabel(f"Time ({u.yr})")
 
+class BPASSDataSet:
+    def __init__(self, ionData, yieldsData, spectraData):
+        """ We need a container for BPASS data that supports units, so we have to make our own since neither hoki nor pandas support explicit units.
+
+        Args:
+            ionData (BPASS ion data): The result of hoki.model_output on a BPASS ion data file
+            yieldsData (BPASS yields data): The result of hoki.model_output on a BPASS yields data file
+            spectraData (BPASS Spectra data): 
+
+        Returns:
+            age (float): The age in years.
+            ionRate (float): The ion production rate in ions/second.
+            mDotWind (float): The wind mass loss rate for the cluster in solar masses / year.
+            eDotWind (float): The energy in winds in erg / second.
+            eDotSN (float): The energy in supernova in erg / second.
+            vWind (float): The wind velocity in cm / second, from 1/2 mv^2.
+            luminosity (float): The bolometric luminosity in erg / secons
+        """
+        self.age = np.power(10, ionData.log_age).values * u.yr
+        self.ionRate = np.power(10, ionData.prod_rate).values / u.s
+        self.mDotWind = (yieldsData.H_wind + yieldsData.He_wind + yieldsData.Z_wind).values * u.Msun / u.yr
+        self.eDotWind = (yieldsData.E_wind.values * u.Msun * u.m**2 / u.s**2 / u.yr).cgs
+        self.eDotSN = (yieldsData.E_sn.values * u.J/u.yr).cgs
+        self.vWind = np.sqrt(2 * self.eDotWind / self.mDotWind).cgs
+        self.luminosity = (spectraData.drop('WL', axis = 1).sum(axis = 0).values * u.Lsun).cgs
+
+    # To-Do:
+    # Add method for outputting as a nice looking table.
+
+BPASSData = BPASSDataSet(ionData, yieldsData, spectraData)
 
 # %%
 # Define timescale functions
@@ -535,6 +581,8 @@ def findNearest(array, value):
         index[i] = (np.abs(array - val)).argmin()
     return index
 
+##### (np.sqrt(3 * BPASSData.ionRate / alphaB) * con.k_B * 10**4 * u.K / (1 * u.pc)**(3/2)).to(u.Ba)
+
 # Define  basic models
 ###############################################################################
 # Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
@@ -554,37 +602,37 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
-modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True, windPressure = True)
-modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
-modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
-modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
-modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
-# modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
-# modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
-# modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
-# modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
-# modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
-# modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
-# modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
-# modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
+# modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
+# modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True, windPressure = True)
+# modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
+# modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
+# modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
+# modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
+# # modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
+# # modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
+# # modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
+# # modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
+# # modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
+# # modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
+# # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
+# # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**6, massNewStars = 10**4)
-regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
-regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
+# regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**6, massNewStars = 10**4)
+# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
+# regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
 
-modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
-regionList = [regionOne,regionTwo,regionThree]
+# modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
+# regionList = [regionOne,regionTwo,regionThree]
 
-modelList = [modelOne]
-regionList = [regionOne]
+# modelList = [modelOne]
+# regionList = [regionOne]
 
-resultList = []
+# resultList = []
 
-for currentModel in modelList:
-    for currentRegion in regionList:
-        currentResult = results(currentModel, currentRegion)
-        resultList.append(currentResult)
+# for currentModel in modelList:
+#     for currentRegion in regionList:
+#         currentResult = results(currentModel, currentRegion)
+#         resultList.append(currentResult)
 
 # resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
 # resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
