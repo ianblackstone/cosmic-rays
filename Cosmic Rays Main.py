@@ -47,21 +47,16 @@ streamPressureFiducial = True
 sweepUpMassFiducial = False
 radiationPressureFiducial = False
 windPressureFiducial = False
+ionPressureFiducial = False
 
 # alphaB recombination constant, since this is not included in astropy.
 alphaB = 2 * 10**-13 * u.cm**3 / u.s
 
 # BPASS file locations
-ionFile = 'bpass/ionizing-bin-imf135_300.a+02.z020.dat'
-colorsFile = 'bpass/colours-bin-imf135_300.a+02.z020.dat'
-spectraFile = 'bpass/spectra-bin-imf135_300.a+02.z020.dat'
-yieldsFile = 'bpass/yields-bin-imf135_300.z020.dat'
-
-# Load BPASS data from files, these will be put in a more usable class for integration with the code.
-ionData = load.model_output(ionFile)
-colorsData = load.model_output(colorsFile)
-spectraData = load.model_output(spectraFile)
-yieldsData = load.model_output(yieldsFile)
+ionFileFiducial = 'bpass/ionizing-bin-imf135_300.a+02.z020.dat'
+colorsFileFiducial = 'bpass/colours-bin-imf135_300.a+02.z020.dat'
+spectraFileFiducial = 'bpass/spectra-bin-imf135_300.a+02.z020.dat'
+yieldsFileFiducial = 'bpass/yields-bin-imf135_300.z020.dat'
 
 ###############################################################################
 # Code for calculating the cosmic ray pressure on regions of a galaxy.
@@ -94,8 +89,13 @@ class model:
                 sweepUpMass = sweepUpMassFiducial,
                 radiationPressure = radiationPressureFiducial,
                 windPressure = windPressureFiducial,
+                ionPressure = ionPressureFiducial,
                 externalMassScale = externalMassScaleFiducial,
-                tauScale = tauScaleFiducial):
+                tauScale = tauScaleFiducial,
+                ionFile = ionFileFiducial,
+                # colorsFile = colorsFileFiducial,
+                spectraFile = spectraFileFiducial,
+                yieldsFile = yieldsFileFiducial):
         """A model object contains the base data and parameters not related to region data for calculations.
 
         Args:
@@ -120,6 +120,7 @@ class model:
             externalMassScale (Float, optional): The scale factor for externally swept up mass. Defaults to externalMassScaleFiducial.
             radiationPressure (Boolean, optional): Boolean to enable radiation pressure in the model. Defaults to radiationPressureFiducial.
             windPressure (Boolean, optional): Boolean to enable wind pressure in the model. Defaults to windPressureFiducial.
+            ionPressure (Boolean, optional): Boolean to enable ionized gas pressure in the model. Defaults to ionPressureFiducial.
         """
         self.name = name
         self.meanFreePath = (meanFreePath * u.pc).cgs
@@ -142,8 +143,15 @@ class model:
         self.externalMassScale = externalMassScale
         self.radiationPressure = radiationPressure
         self.windPressure = windPressure
+        self.ionPressure = ionPressure
         
-
+        
+        ionData = load.model_output(ionFile)
+        # colorsData = load.model_output(colorsFile)
+        spectraData = load.model_output(spectraFile)
+        yieldsData = load.model_output(yieldsFile)
+        self.BPASSData = BPASSDataSet(ionData, yieldsData, spectraData)
+        
     def __str__(self):
         return f"Model: {self.name}"
 
@@ -192,8 +200,8 @@ class region:
         self.massOldStars = (massOldStars * u.solMass).cgs
         self.massTotal = self.massNewStars + self.massShell
         self.externalGasDensity = (externalGasDensity * con.m_p / u.cm**3).cgs
-        self.electronDensity = self.massShell / (4/3*np.pi*(self.radius)**3) / con.m_p.cgs
-        self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * np.pi * self.radius**4)).to(u.Ba)
+        self.electronDensity = self.massShell / (4/3*math.pi*(self.radius)**3) / con.m_p.cgs
+        self.eddPressure = (con.G * self.massTotal * self.massShell / (4 * math.pi * self.radius**4)).to(u.Ba)
         self.luminosityPerMass = (luminosityPerMass * u.solLum / u.solMass).cgs
         if luminosity:
             self.luminosity = (luminosity * u.solLum).cgs
@@ -243,18 +251,18 @@ class results:
         self.time = (ODESolve.y[2] * u.s).to(u.yr)
         self.massShell = ODESolve.y[3] * u.g
         self.mDotWind = (2 * self.region.energyDotWind / self.model.vWind**2).cgs
-        self.innerShockGasDensity = (self.mDotWind / (4 * np.pi * self.radius**2 * self.model.vWind)).cgs
+        self.innerShockGasDensity = (self.mDotWind / (4 * math.pi * self.radius**2 * self.model.vWind)).cgs
         self.innerShockNumberDensity = 4 * self.innerShockGasDensity / con.m_p.cgs
         self.tPion = self.model.pionLifetime / self.innerShockNumberDensity / u.cm**3
         self.tDiff = (3*self.radius**2 / (con.c * self.model.meanFreePath)).cgs
         self.tAdv = (self.radius/self.velocity).cgs
         self.tStream = (self.radius/self.model.vAlfven).cgs
-        self.energyCR = (self.pressure * 4 * np.pi * self.radius**3).cgs
+        self.energyCR = (self.pressure * 4 * math.pi * self.radius**3).cgs
         self.gammaLuminosity = (1 / 3 * self.energyCR / self.tPion).cgs
 
         self.dvdr, self.dpdr, _, self.dmdr = getDVDR(self.radius.cgs.value, [self.velocity.cgs.value, self.pressure.cgs.value, self.time.cgs.value, self.massShell.cgs.value], self.region, self.model, verbose = True)
 
-        dpdrConversion = 4 * np.pi * self.radius**2/(self.massShell*self.velocity) * u.pc
+        dpdrConversion = 4 * math.pi * self.radius**2/(self.massShell*self.velocity) * u.pc
 
         self.dvdr.diffusion = (np.cumsum(self.dpdr.diffusion) * dpdrConversion).cgs
         self.dvdr.advection = (np.cumsum(self.dpdr.advection) * dpdrConversion).cgs
@@ -362,11 +370,11 @@ class results:
         # Define the initial pressure as the diffusion pressure
         initialPressure = ((self.model.windToCREnergyFraction * self.region.energyDotWind) * self.model.gasColumnHeight / (con.c * self.model.meanFreePath))
 
-        initialForce = (self.model.eddRatio *  initialPressure * 4 * np.pi * self.model.gasColumnHeight**2).cgs
+        initialForce = (self.model.eddRatio *  initialPressure * 4 * math.pi * self.model.gasColumnHeight**2).cgs
 
-        integrationConstantDiffusion = np.power(self.model.vInitial,2).cgs - (initialForce * 4 * np.pi * self.model.gasColumnHeight / self.region.massShell).cgs + (con.G * (self.region.massNewStars + self.region.massShell)/self.model.gasColumnHeight).cgs
+        integrationConstantDiffusion = np.power(self.model.vInitial,2).cgs - (initialForce * 4 * math.pi * self.model.gasColumnHeight / self.region.massShell).cgs + (con.G * (self.region.massNewStars + self.region.massShell)/self.model.gasColumnHeight).cgs
 
-        analyticVelocityDiffusion = np.sqrt(initialForce * 4 * np.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
+        analyticVelocityDiffusion = np.sqrt(initialForce * 4 * math.pi * self.radius / self.region.massShell - con.G * (self.region.massNewStars + self.region.massShell)/self.radius + integrationConstantDiffusion).to(u.km/u.s)
 
         advVelocity = (np.cbrt((3 * self.model.windToCREnergyFraction * self.region.energyDotWind * self.radius/(4 * self.region.massShell)))).to(u.km/u.s)
 
@@ -420,8 +428,6 @@ class BPASSDataSet:
     # To-Do:
     # Add method for outputting as a nice looking table.
 
-BPASSData = BPASSDataSet(ionData, yieldsData, spectraData)
-
 # %%
 # Define timescale functions
 ###############################################################################
@@ -442,6 +448,10 @@ def getMinimumTime(rShell, vShell, model):
 
     return min(tDiff, tAdv, pionTime)
 
+
+# %%
+# Define ODE functions
+###############################################################################
 def getDVDR(rShell, X, region, model, verbose = False):
     """Set of coupled ODEs giving dv/dr, dp/dr, and dt/dr
 
@@ -462,7 +472,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
         dpdr = 0
 
     if model.energyInjection:
-        energy = model.windToCREnergyFraction * region.energyDotWind.value / (4 * np.pi * rShell**3 * vShell)
+        energy = model.windToCREnergyFraction * region.energyDotWind.value / (4 * math.pi * rShell**3 * vShell)
 
         if verbose:
             dpdr.energyInjection = energy * u.Ba / u.cm
@@ -496,7 +506,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
     else:
         dvdr = 0
 
-    dvdrCR = pCR * 4 * np.pi * rShell**2/(mShell*vShell)
+    dvdrCR = pCR * 4 * math.pi * rShell**2/(mShell*vShell)
     dvdrGrav = -con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
     if verbose:
@@ -523,7 +533,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
             dvdr += wind
 
     if model.sweepUpMass:
-        dmdr = 4 * np.pi * region.externalGasDensity.value * (model.gasColumnHeight.value/rShell)**model.externalMassScale * rShell**2
+        dmdr = 4 * math.pi * region.externalGasDensity.value * (model.gasColumnHeight.value/rShell)**model.externalMassScale * rShell**2
 
         mass = vShell * dmdr / mShell
 
@@ -531,6 +541,14 @@ def getDVDR(rShell, X, region, model, verbose = False):
             dvdr.mass = mass / u.s
         else:
             dvdr -= mass
+
+    if model.ionPressure:
+        ion = (np.sqrt(3 * np.interp(t * u.s, model.BPASSData.age, model.BPASSData.ionRate) * (region.massNewStars / (10**6 * u.Msun)) / alphaB) * con.k_B * 10**4 * u.K / (1 * u.pc)**(3/2) / mShell / vShell).to(u.Ba).value * 4 * math.pi * rShell**2
+
+        if verbose:
+            dvdr.ion = ion / u.s
+        else:
+            dvdr += ion
 
     dtdr = 1/abs(vShell)
 
@@ -581,8 +599,6 @@ def findNearest(array, value):
         index[i] = (np.abs(array - val)).argmin()
     return index
 
-##### (np.sqrt(3 * BPASSData.ionRate / alphaB) * con.k_B * 10**4 * u.K / (1 * u.pc)**(3/2)).to(u.Ba)
-
 # Define  basic models
 ###############################################################################
 # Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
@@ -602,40 +618,40 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-# modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
-# modelTwo = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = True, windPressure = True)
-# modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
-# modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
-# modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
-# modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
-# # modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
-# # modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
-# # modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
-# # modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
-# # modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
-# # modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
-# # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
-# # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
+modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
+modelTwo = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True)
+modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
+modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
+modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
+modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
+# modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
+# modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
+# modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
+# modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
+# modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
+# modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
+# modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
+# modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-# regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**6, massNewStars = 10**4)
-# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
-# regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
+regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**6, massNewStars = 10**4)
+regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
+regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
 
-# modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
-# regionList = [regionOne,regionTwo,regionThree]
+modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
+regionList = [regionOne,regionTwo,regionThree]
 
-# modelList = [modelOne]
-# regionList = [regionOne]
+modelList = [modelOne, modelTwo]
+regionList = [regionOne]
 
-# resultList = []
+resultList = []
 
-# for currentModel in modelList:
-#     for currentRegion in regionList:
-#         currentResult = results(currentModel, currentRegion)
-#         resultList.append(currentResult)
+for currentModel in modelList:
+    for currentRegion in regionList:
+        currentResult = results(currentModel, currentRegion)
+        resultList.append(currentResult)
 
-# resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
-# resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
+resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
+resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
 
 # for res in resultList:
 #     res.verify()
@@ -647,7 +663,7 @@ testRegion = region("Test Region")
 #     res.plot("radius", "velocity", scale = "symlog")
 
 
-## energyInjection = (res.model.windToCREnergyFraction * res.region.energyDotWind / (4 * np.pi * res.radius**3 * res.velocity)).cgs
+## energyInjection = (res.model.windToCREnergyFraction * res.region.energyDotWind / (4 * math.pi * res.radius**3 * res.velocity)).cgs
 ## advectionPressure = (4 * res.pressure / res.radius).cgs
 ## streamPressure = ((3*res.velocity + res.model.vAlfven) * res.pressure / ( res.radius * res.velocity)).cgs
 ## diffusionPressure = (con.c.cgs * res.model.meanFreePath * res.pressure / (res.velocity * res.radius**2)).cgs
@@ -956,7 +972,7 @@ testRegion = region("Test Region")
 
 # plt.figure(dpi = 200)
 
-# energyInjection = (proposalResultsOne.model.windToCREnergyFraction * proposalResultsOne.region.energyDotWind / (4 * np.pi * proposalResultsOne.radius**3 * proposalResultsOne.velocity)).cgs
+# energyInjection = (proposalResultsOne.model.windToCREnergyFraction * proposalResultsOne.region.energyDotWind / (4 * math.pi * proposalResultsOne.radius**3 * proposalResultsOne.velocity)).cgs
 
 # diffTerm = (con.c  * proposalResultsOne.model.meanFreePath * proposalResultsOne.pressure / (proposalResultsOne.velocity * proposalResultsOne.radius**2)).cgs
 
@@ -984,9 +1000,9 @@ testRegion = region("Test Region")
 
 # fig, ax = plt.subplots(dpi=200)
 
-# initialForce = (testRegion.eddPressure * 4 * np.pi * testRegion.radius**2).to(u.N)
+# initialForce = (testRegion.eddPressure * 4 * math.pi * testRegion.radius**2).to(u.N)
 
-# analyticVelocity = np.sqrt(initialForce * 4 * np.pi * r / testRegion.massShell - con.G * (testRegion.massNewStars + testRegion.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
+# analyticVelocity = np.sqrt(initialForce * 4 * math.pi * r / testRegion.massShell - con.G * (testRegion.massNewStars + testRegion.massShell)/r + 10**8 * u.m**2 / u.s**2).to(u.km/u.s)
 
 # plt.plot(r, v, label=r"$v$")
 # plt.plot(r, analyticVelocity, label = r"Analytic velocity")
@@ -1023,7 +1039,7 @@ testRegion = region("Test Region")
 # dvdr, dpdr, dtdr = getDVDR(r.value, [v.value, p.value, t.value], region, model)
 
 # energyInjection = model.windToCREnergyFraction * \
-##             region.energyDotWind / (4 * np.pi * r**3 * v)
+##             region.energyDotWind / (4 * math.pi * r**3 * v)
 
 # advectionPressure = -4 * p / r
 
@@ -1060,11 +1076,11 @@ testRegion = region("Test Region")
 # p = ODESolve.y[1] * u.Ba
 # t = ODESolve.y[2] * u.yr
 
-# initialForce = (region.eddPressure * 4 * np.pi * region.radius**2).to(u.N)
+# initialForce = (region.eddPressure * 4 * math.pi * region.radius**2).to(u.N)
 
-# analyticPressure =  initialForce / (4*np.pi*r**2)
+# analyticPressure =  initialForce / (4*math.pi*r**2)
 
-# force = (p * 4 * np.pi * r**2).cgs
+# force = (p * 4 * math.pi * r**2).cgs
 # gravity = (con.G * (region.massNewStars + region.massShell) * region.massShell / r**2).cgs
 
 # ax2 = plt.twinx(ax1)
