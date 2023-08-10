@@ -518,7 +518,8 @@ def getDVDR(rShell, X, region, model, verbose = False):
     dmdr = 0
 
     if model.radiationPressure:
-        radiation = region.luminosity.value / con.c.cgs.value / vShell / mShell * (1 - np.exp(-region.tauInitial * (model.gasColumnHeight.cgs.value / rShell)**2))
+        luminosity = np.interp(t * u.s, model.BPASSData.age, model.BPASSData.luminosity) * region.massNewStars / (10**6 * u.Msun)
+        radiation = luminosity.cgs.value / con.c.cgs.value / vShell / mShell * (1 - np.exp(-region.tauInitial * (model.gasColumnHeight.cgs.value / rShell)**2))
 
         if verbose:
             dvdr.radiation = radiation / u.s
@@ -526,7 +527,11 @@ def getDVDR(rShell, X, region, model, verbose = False):
             dvdr += radiation
 
     if model.windPressure:
-        wind = region.luminosity.value / con.c.cgs.value / vShell / mShell
+        eDotWind = np.interp(t * u.s, model.BPASSData.age, model.BPASSData.eDotWind) * region.massNewStars / (10**6 * u.Msun)
+        mDotWind = np.interp(t * u.s, model.BPASSData.age, model.BPASSData.mDotWind) * region.massNewStars / (10**6 * u.Msun)
+        vWind = np.sqrt(2 * eDotWind / mDotWind)
+
+        wind = (2 * eDotWind / vWind).cgs.value / vShell / mShell
         if verbose:
             dvdr.wind = wind / u.s
         else:
