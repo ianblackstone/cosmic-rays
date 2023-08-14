@@ -32,8 +32,8 @@ ageFiducial = 1 # Myr
 # luminosityFiducial = 10**8 # LSun
 radiusFiducial = 10 # pc
 radiusOldStarsFiducial = 10**4 # pc
-massShellFiducial = 10**2 # MSun
-massNewStarsFiducial = 10**2 # MSun
+massShellFiducial = 10**4 # MSun
+massNewStarsFiducial = 10**4 # MSun
 energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
 massOldStarsFiducial = 10**4 # MSun
 externalGasDensityFiducial = 1 # protons/cm^3
@@ -507,7 +507,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
         dvdr = 0
 
     dvdrCR = pCR * 4 * math.pi * rShell**2/(mShell*vShell)
-    dvdrGrav = -con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
+    dvdrGrav = con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
     if verbose:
         dvdr.CR = dvdrCR / u.s
@@ -548,7 +548,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
             dvdr -= mass
 
     if model.ionPressure:
-        ion = (np.sqrt(3 * np.interp(t * u.s, model.BPASSData.age, model.BPASSData.ionRate) * (region.massNewStars / (10**6 * u.Msun)) / alphaB) * con.k_B * 10**4 * u.K / (1 * u.pc)**(3/2) / mShell / vShell).to(u.Ba).value * 4 * math.pi * rShell**2
+        ion = (np.sqrt(3 * np.interp(t * u.s, model.BPASSData.age, model.BPASSData.ionRate) * (region.massNewStars / (10**6 * u.Msun)) / alphaB) * con.k_B * 10**4 * u.K / (rShell * u.cm)**(3/2) / mShell / vShell).to(u.Ba).value * 4 * math.pi * rShell **2
 
         if verbose:
             dvdr.ion = ion / u.s
@@ -625,7 +625,7 @@ testRegion = region("Test Region")
 
 modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
 modelTwo = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True)
-modelThree = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = True, windPressure = True)
+modelThree = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True, sweepUpMass = True)
 modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
 modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
 modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
@@ -638,14 +638,14 @@ modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpM
 # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
 # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**6, massNewStars = 10**4)
-regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5)
-regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**6)
+regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**4, massNewStars = 10**4)
+regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**4)
+regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**4)
 
 modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
 regionList = [regionOne,regionTwo,regionThree]
 
-modelList = [modelOne, modelTwo]
+modelList = [modelOne, modelTwo, modelThree]
 regionList = [regionOne]
 
 resultList = []
