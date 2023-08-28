@@ -10,7 +10,6 @@ from astropy import units as u
 from matplotlib.collections import LineCollection
 from hoki import load
 
-
 # %%
 # Set fiducial values
 ###############################################################################
@@ -48,6 +47,7 @@ sweepUpMassFiducial = False
 radiationPressureFiducial = False
 windPressureFiducial = False
 ionPressureFiducial = False
+gravityFiducial = True
 
 # alphaB recombination constant, since this is not included in astropy.
 alphaB = 2 * 10**-13 * u.cm**3 / u.s
@@ -95,7 +95,8 @@ class model:
                 ionFile = ionFileFiducial,
                 # colorsFile = colorsFileFiducial,
                 spectraFile = spectraFileFiducial,
-                yieldsFile = yieldsFileFiducial):
+                yieldsFile = yieldsFileFiducial,
+                gravity = gravityFiducial):
         """A model object contains the base data and parameters not related to region data for calculations.
 
         Args:
@@ -121,6 +122,7 @@ class model:
             radiationPressure (Boolean, optional): Boolean to enable radiation pressure in the model. Defaults to radiationPressureFiducial.
             windPressure (Boolean, optional): Boolean to enable wind pressure in the model. Defaults to windPressureFiducial.
             ionPressure (Boolean, optional): Boolean to enable ionized gas pressure in the model. Defaults to ionPressureFiducial.
+            gravity (Boolean, optional): Boolean to enable gravity in the model. Defaults to gravityFiducial.
         """
         self.name = name
         self.meanFreePath = (meanFreePath * u.pc).cgs
@@ -144,6 +146,7 @@ class model:
         self.radiationPressure = radiationPressure
         self.windPressure = windPressure
         self.ionPressure = ionPressure
+        self.gravity = gravity
         
         
         ionData = load.model_output(ionFile)
@@ -264,10 +267,14 @@ class results:
 
         dpdrConversion = 4 * math.pi * self.radius**2/(self.massShell*self.velocity) * u.pc
 
-        self.dvdr.diffusion = (np.cumsum(self.dpdr.diffusion) * dpdrConversion).cgs
-        self.dvdr.advection = (np.cumsum(self.dpdr.advection) * dpdrConversion).cgs
-        self.dvdr.streaming = (np.cumsum(self.dpdr.streaming) * dpdrConversion).cgs
-        self.dvdr.energyInjection = (np.cumsum(self.dpdr.energyInjection) * dpdrConversion).cgs
+        if (self.model.diffusionPressure):
+            self.dvdr.diffusion = (np.cumsum(self.dpdr.diffusion) * dpdrConversion).cgs
+        if (self.model.advectionPressure):
+            self.dvdr.advection = (np.cumsum(self.dpdr.advection) * dpdrConversion).cgs
+        if (self.model.streamPressure):
+            self.dvdr.streaming = (np.cumsum(self.dpdr.streaming) * dpdrConversion).cgs
+        if (self.model.energyInjection):
+            self.dvdr.energyInjection = (np.cumsum(self.dpdr.energyInjection) * dpdrConversion).cgs
 
         self.tauPi = (self.radius * (self.region.externalGasDensity / con.m_p * u.cm**3)/(con.c * self.model.pionLifetime)).cgs
         self.tauScatt = (self.radius/self.model.meanFreePath).cgs
@@ -406,7 +413,7 @@ class BPASSDataSet:
         Args:
             ionData (BPASS ion data): The result of hoki.model_output on a BPASS ion data file
             yieldsData (BPASS yields data): The result of hoki.model_output on a BPASS yields data file
-            spectraData (BPASS Spectra data): 
+            spectraData (BPASS Spectra data):
 
         Returns:
             age (float): The age in years.
@@ -424,6 +431,7 @@ class BPASSDataSet:
         self.eDotSN = (yieldsData.E_sn.values * u.J/u.yr).cgs
         self.vWind = np.sqrt(2 * self.eDotWind / self.mDotWind).cgs
         self.luminosity = (spectraData.drop('WL', axis = 1).sum(axis = 0).values * u.Lsun).cgs
+        self.ionLuminosity = (spectraData.loc[(con.h * con.c / (spectraData.WL.values * u.angstrom)).to(u.eV) > (13.6 * u.eV)].drop('WL', axis = 1).sum(axis = 0).values * u.Lsun).cgs
 
     # To-Do:
     # Add method for outputting as a nice looking table.
@@ -471,8 +479,12 @@ def getDVDR(rShell, X, region, model, verbose = False):
     else:
         dpdr = 0
 
+    if (model.energyInjection or model.windPressure):
+        eDotWind = (np.interp(t * u.s, model.BPASSData.age, model.BPASSData.eDotWind) * region.massNewStars / (10**6 * u.Msun)).cgs.value
+        # eDotWind = (2500 * u.Lsun).cgs.value
+
     if model.energyInjection:
-        energy = model.windToCREnergyFraction * region.energyDotWind.value / (4 * math.pi * rShell**3 * vShell)
+        energy = model.windToCREnergyFraction * eDotWind / (4 * math.pi * rShell**3 * vShell)
 
         if verbose:
             dpdr.energyInjection = energy * u.Ba / u.cm
@@ -507,13 +519,19 @@ def getDVDR(rShell, X, region, model, verbose = False):
         dvdr = 0
 
     dvdrCR = pCR * 4 * math.pi * rShell**2/(mShell*vShell)
-    dvdrGrav = con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
 
     if verbose:
         dvdr.CR = dvdrCR / u.s
-        dvdr.gravity = dvdrGrav / u.s
     else:
-        dvdr = dvdrCR - dvdrGrav
+        dvdr = dvdrCR
+
+    if model.gravity:
+        dvdrGrav = con.G.cgs.value*(mShell + region.massNewStars.value)/(vShell*rShell**2)
+        if verbose:
+            dvdr.CR = dvdrCR / u.s
+            dvdr.gravity = dvdrGrav / u.s
+        else:
+            dvdr -= dvdrGrav
 
     dmdr = 0
 
@@ -527,7 +545,6 @@ def getDVDR(rShell, X, region, model, verbose = False):
             dvdr += radiation
 
     if model.windPressure:
-        eDotWind = np.interp(t * u.s, model.BPASSData.age, model.BPASSData.eDotWind) * region.massNewStars / (10**6 * u.Msun)
         mDotWind = np.interp(t * u.s, model.BPASSData.age, model.BPASSData.mDotWind) * region.massNewStars / (10**6 * u.Msun)
         vWind = np.sqrt(2 * eDotWind / mDotWind)
 
@@ -638,14 +655,14 @@ modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpM
 # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
 # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region(r"MShell: $10^4$ $M_\odot$", massShell = 10**4, massNewStars = 10**4)
+regionOne = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5, massNewStars = 10**4)
 regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**4)
 regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**4)
 
 modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
 regionList = [regionOne,regionTwo,regionThree]
 
-modelList = [modelOne, modelTwo, modelThree]
+modelList = [modelOne]
 regionList = [regionOne]
 
 resultList = []
