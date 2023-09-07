@@ -481,7 +481,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
 
     if (model.energyInjection or model.windPressure):
         eDotWind = (np.interp(t * u.s, model.BPASSData.age, model.BPASSData.eDotWind) * region.massNewStars / (10**6 * u.Msun)).cgs.value
-        # eDotWind = (2500 * u.Lsun).cgs.value
+        # eDotWind = (8500 * u.Lsun).cgs.value
 
     if model.energyInjection:
         energy = model.windToCREnergyFraction * eDotWind / (4 * math.pi * rShell**3 * vShell)
@@ -565,7 +565,7 @@ def getDVDR(rShell, X, region, model, verbose = False):
             dvdr -= mass
 
     if model.ionPressure:
-        ion = (np.sqrt(3 * np.interp(t * u.s, model.BPASSData.age, model.BPASSData.ionRate) * (region.massNewStars / (10**6 * u.Msun)) / alphaB) * con.k_B * 10**4 * u.K / (rShell * u.cm)**(3/2) / mShell / vShell).to(u.Ba).value * 4 * math.pi * rShell **2
+        ion = (-np.sqrt(3 * np.interp(t * u.s, model.BPASSData.age, model.BPASSData.ionRate) * (region.massNewStars / (10**6 * u.Msun)) / alphaB) * con.k_B * 10**4 * u.K / (rShell * u.cm)**(3/2) / mShell / vShell).to(u.Ba).value * 4 * math.pi * rShell **2
 
         if verbose:
             dvdr.ion = ion / u.s
@@ -588,10 +588,27 @@ def solveODE(model, region, verbose = True):
         ODESolve: A solve_ivp object.
     """
     # initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
-    initialPressure = model.eddRatio * region.eddPressure.cgs.value
-
+    initialPressure = model.eddRatio * region.eddPressure
     # Need to set the initial tau to allow for proper radiation pressure calculation.
     region.calculateTau(model)
+
+    if model.radiationPressure:
+        luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
+        initialPressure -= luminosity.cgs / con.c.cgs * (1 - np.exp(-region.tauInitial)) / (4 * math.pi * model.gasColumnHeight**2)
+
+    if model.windPressure:
+        eDotWind = model.BPASSData.eDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+        mDotWind = model.BPASSData.mDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+        vWind = np.sqrt(2 * eDotWind / mDotWind)
+
+        initialPressure -= (2 * eDotWind / vWind / (4 * math.pi * model.gasColumnHeight**2)).cgs
+
+    if model.ionPressure:
+        ionRate = model.BPASSData.ionRate[0] * region.massNewStars / (10**6 * u.Msun)
+        initialPressure -= np.sqrt(3 * ionRate / alphaB) * con.k_B * 10**4 * u.K / (model.gasColumnHeight)**(3/2)
+
+    print(initialPressure)
+    initialPressure = max(initialPressure.value, 0)
 
     X0 = [model.vInitial.value, initialPressure, region.age.value, region.massShell.value]
 
@@ -620,6 +637,26 @@ def findNearest(array, value):
     for i, val in enumerate(value):
         index[i] = (np.abs(array - val)).argmin()
     return index
+
+def calculateForce(model, region, rSpan):
+
+    luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
+    radiationPressure = (luminosity.cgs / con.c.cgs * (1 - np.exp(-region.tauInitial)) / (4 * math.pi * rSpan**2)).cgs
+
+    eDotWind = model.BPASSData.eDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+    mDotWind = model.BPASSData.mDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+    vWind = np.sqrt(2 * eDotWind / mDotWind)
+
+    windPressure = (2 * eDotWind / vWind / (4 * math.pi * rSpan**2)).cgs
+
+    ionRate = model.BPASSData.ionRate[0] * region.massNewStars / (10**6 * u.Msun)
+    ionizedPressure = (np.sqrt(3 * ionRate / alphaB) * con.k_B * 10**4 * u.K / (rSpan)**(3/2)).cgs
+
+    diffusionPressure = eDotWind * model.windToCREnergyFraction / (4 * math.pi * rSpan * con.c * model.meanFreePath)
+
+    gravity = (con.G * region.massTotal * region.massShell / (rSpan**2))
+
+    return [radiationPressure, windPressure, ionizedPressure, diffusionPressure, gravity]
 
 # Define  basic models
 ###############################################################################
@@ -662,8 +699,8 @@ regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**4)
 modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
 regionList = [regionOne,regionTwo,regionThree]
 
-modelList = [modelOne]
-regionList = [regionOne]
+# modelList = [modelOne]
+# regionList = [regionOne]
 
 resultList = []
 
