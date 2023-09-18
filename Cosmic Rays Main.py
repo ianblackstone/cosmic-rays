@@ -436,6 +436,15 @@ class BPASSDataSet:
     # To-Do:
     # Add method for outputting as a nice looking table.
 
+class genericData:
+    def __init__(self, name):
+        """This is a generic class for any dataset.
+
+        Args:
+            name (string): The name of the dataset
+        """
+
+
 # %%
 # Define timescale functions
 ###############################################################################
@@ -576,6 +585,92 @@ def getDVDR(rShell, X, region, model, verbose = False):
 
     return [dvdr, dpdr, dtdr, dmdr]
 
+def findNearest(array, value):
+    """Finds the nearest value in an array and returns the index
+
+    Args:
+        array (array): Array of numbers to search.
+        value (array): Array of the values to search for.
+
+    Returns:
+        index (int): The index of the nearest value.
+    """
+    array = np.asarray(array)
+    value = np.asarray(value)
+    index = np.zeros_like(value)
+    for i, val in enumerate(value):
+        index[i] = (np.abs(array - val)).argmin()
+    return index
+
+def calculateForce(model, region, rSpan = None):
+    """Calculates the force balance for a given model and region's initial conditions
+
+    Args:
+        model (_type_): A model object.
+        region (_type_): A region object.
+        rSpan (optional, number or array of numbers): An initial column height or array of column heights to use instead of the model values. Input in parsecs.
+
+    Returns:
+        forces (genericData): An object containing the pressures present in the model.
+        pressures (genericData): An object containing the pressures present in the model.
+    """
+
+    if rSpan == None:
+        rSpan = [model.gasColumnHeight]
+    elif type(rSpan) != list:
+        rSpan = [rSpan]
+
+    if hasattr(rSpan, 'unit') == False:
+        rSpan *= u.pc
+
+    luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
+    radiationForce = (luminosity.cgs / con.c.cgs * (1 - np.exp(-region.tauInitial))).cgs
+    radiationPressure = (radiationForce / (4 * math.pi * np.power(rSpan,2))).cgs
+
+    eDotWind = model.BPASSData.eDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+    mDotWind = model.BPASSData.mDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+    vWind = np.sqrt(2 * eDotWind / mDotWind)
+
+    windForce = (2 * eDotWind / vWind).cgs
+    windPressure = (windForce / (4 * math.pi * np.power(rSpan,2))).cgs
+
+    ionRate = model.BPASSData.ionRate[0] * region.massNewStars / (10**6 * u.Msun)
+    ionizedPressure = (np.sqrt(3 * ionRate / alphaB) * con.k_B * 10**4 * u.K / np.power(rSpan,3/2)).cgs
+    ionizedForce = (ionizedPressure * 4 * math.pi * np.power(rSpan,2)).cgs
+
+    diffusionPressure = (eDotWind * model.windToCREnergyFraction / (4 * math.pi * rSpan * con.c * model.meanFreePath)).cgs
+    diffusionForce = (diffusionPressure * (4 * math.pi * np.power(rSpan,2))).to(u.dyn)
+
+    gravity = (con.G * region.massTotal * region.massShell / (np.power(rSpan,2))).cgs
+
+    totalForce = np.copy(diffusionForce)
+
+    if model.radiationPressure:
+        totalForce += radiationForce
+    if model.windPressure:
+        totalForce += windForce
+    if model.ionPressure:
+        totalForce += ionizedForce
+    if model.gravity:
+        totalForce -= gravity
+
+    forces = genericData("Forces")
+    forces.radiation = radiationForce
+    forces.wind = windForce
+    forces.ionizedGas = ionizedForce
+    forces.gravity = gravity
+    forces.diffusion = diffusionForce
+    forces.total = totalForce
+
+    pressures = genericData("Pressures")
+    pressures.radiation = radiationPressure
+    pressures.wind = windPressure
+    pressures.ionizedGas = ionizedPressure
+    pressures.diffusion = diffusionPressure
+
+    return forces, pressures
+
+
 def solveODE(model, region, verbose = True):
     """Returns the ODEs for a given model and region
 
@@ -587,10 +682,13 @@ def solveODE(model, region, verbose = True):
     Returns:
         ODESolve: A solve_ivp object.
     """
-    # initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
-    initialPressure = model.eddRatio * region.eddPressure
-    # Need to set the initial tau to allow for proper radiation pressure calculation.
     region.calculateTau(model)
+
+    forces, pressures = calculateForce(model, region)
+    # initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
+    initialPressure = pressures.diffusion
+    # Need to set the initial tau to allow for proper radiation pressure calculation.
+    
 
     if model.radiationPressure:
         luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
@@ -620,43 +718,6 @@ def solveODE(model, region, verbose = True):
     ODESolve = inte.solve_ivp(getDVDR, rSpan, X0, method = "Radau", args=[region, model], max_step=(1 * u.pc).cgs.value, rtol = 10e-6, atol = 10e-9)
 
     return ODESolve
-
-def findNearest(array, value):
-    """Finds the nearest value in an array and returns the index
-
-    Args:
-        array (array): Array of numbers to search.
-        value (array): Array of the values to search for.
-
-    Returns:
-        index (int): The index of the nearest value.
-    """
-    array = np.asarray(array)
-    value = np.asarray(value)
-    index = np.zeros_like(value)
-    for i, val in enumerate(value):
-        index[i] = (np.abs(array - val)).argmin()
-    return index
-
-def calculateForce(model, region, rSpan):
-
-    luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
-    radiationPressure = (luminosity.cgs / con.c.cgs * (1 - np.exp(-region.tauInitial)) / (4 * math.pi * rSpan**2)).cgs
-
-    eDotWind = model.BPASSData.eDotWind[0] * region.massNewStars / (10**6 * u.Msun)
-    mDotWind = model.BPASSData.mDotWind[0] * region.massNewStars / (10**6 * u.Msun)
-    vWind = np.sqrt(2 * eDotWind / mDotWind)
-
-    windPressure = (2 * eDotWind / vWind / (4 * math.pi * rSpan**2)).cgs
-
-    ionRate = model.BPASSData.ionRate[0] * region.massNewStars / (10**6 * u.Msun)
-    ionizedPressure = (np.sqrt(3 * ionRate / alphaB) * con.k_B * 10**4 * u.K / (rSpan)**(3/2)).cgs
-
-    diffusionPressure = eDotWind * model.windToCREnergyFraction / (4 * math.pi * rSpan * con.c * model.meanFreePath)
-
-    gravity = (con.G * region.massTotal * region.massShell / (rSpan**2))
-
-    return [radiationPressure, windPressure, ionizedPressure, diffusionPressure, gravity]
 
 # Define  basic models
 ###############################################################################
