@@ -33,7 +33,7 @@ radiusFiducial = 10 # pc
 radiusOldStarsFiducial = 10**4 # pc
 massShellFiducial = 10**4 # MSun
 massNewStarsFiducial = 10**4 # MSun
-energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun
+energyDotWindFiducial = 2500 * massNewStarsFiducial/10**4 # LSun ## DEPRECATED
 massOldStarsFiducial = 10**4 # MSun
 externalGasDensityFiducial = 1 # protons/cm^3
 
@@ -213,8 +213,16 @@ class region:
 
         self.luminosity = (con.c * con.G * self.massShell * (self.massShell + self.massNewStars) / (10 * u.pc)**2).cgs
 
-    def calculateTau(self, model):
-        self.tauInitial = (model.tauScale * self.massShell / model.gasColumnHeight**2).cgs
+    def calculateTau(self, model, r = None):
+        """Calculate the initialTau for a given model or radius
+
+        Args:
+            model (model): a model object
+            r (number or array, optional): The radius to use if overriding the model value. Can be an array. Defaults to None.
+        """
+        
+        radius = model.gascolumnHeight if r == None else r * u.pc
+        self.tauInitial = (model.tauScale * self.massShell / radius**2).cgs
 
     def __str__(self):
         return f"Region: {self.name}"
@@ -686,29 +694,29 @@ def solveODE(model, region, verbose = True):
 
     forces, pressures = calculateForce(model, region)
     # initialPressure = ((model.windToCREnergyFraction * region.energyDotWind) * model.gasColumnHeight / (con.c * model.meanFreePath) / (4 * math.pi * model.gasColumnHeight**2)).cgs.value
-    initialPressure = pressures.diffusion
+    initialPressure = pressures.diffusion[0]
     # Need to set the initial tau to allow for proper radiation pressure calculation.
     
 
-    if model.radiationPressure:
-        luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
-        initialPressure -= luminosity.cgs / con.c.cgs * (1 - np.exp(-region.tauInitial)) / (4 * math.pi * model.gasColumnHeight**2)
+    # if model.radiationPressure:
+    #     luminosity = model.BPASSData.luminosity[0] * region.massNewStars / (10**6 * u.Msun)
+    #     initialPressure -= luminosity.cgs / con.c.cgs * (1 - np.exp(-region.tauInitial)) / (4 * math.pi * model.gasColumnHeight**2)
 
-    if model.windPressure:
-        eDotWind = model.BPASSData.eDotWind[0] * region.massNewStars / (10**6 * u.Msun)
-        mDotWind = model.BPASSData.mDotWind[0] * region.massNewStars / (10**6 * u.Msun)
-        vWind = np.sqrt(2 * eDotWind / mDotWind)
+    # if model.windPressure:
+    #     eDotWind = model.BPASSData.eDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+    #     mDotWind = model.BPASSData.mDotWind[0] * region.massNewStars / (10**6 * u.Msun)
+    #     vWind = np.sqrt(2 * eDotWind / mDotWind)
 
-        initialPressure -= (2 * eDotWind / vWind / (4 * math.pi * model.gasColumnHeight**2)).cgs
+    #     initialPressure -= (2 * eDotWind / vWind / (4 * math.pi * model.gasColumnHeight**2)).cgs
 
-    if model.ionPressure:
-        ionRate = model.BPASSData.ionRate[0] * region.massNewStars / (10**6 * u.Msun)
-        initialPressure -= np.sqrt(3 * ionRate / alphaB) * con.k_B * 10**4 * u.K / (model.gasColumnHeight)**(3/2)
+    # if model.ionPressure:
+    #     ionRate = model.BPASSData.ionRate[0] * region.massNewStars / (10**6 * u.Msun)
+    #     initialPressure -= np.sqrt(3 * ionRate / alphaB) * con.k_B * 10**4 * u.K / (model.gasColumnHeight)**(3/2)
 
-    print(initialPressure)
-    initialPressure = max(initialPressure.value, 0)
+    # print(initialPressure)
+    # initialPressure = max(initialPressure.value, 0)
 
-    X0 = [model.vInitial.value, initialPressure, region.age.value, region.massShell.value]
+    X0 = [model.vInitial.value, initialPressure.value, region.age.value, region.massShell.value]
 
     rSpan = (model.gasColumnHeight.value, 1000*model.gasColumnHeight.value)
 
@@ -738,49 +746,49 @@ testRegion = region("Test Region")
 # Fill out current models and regions
 ###############################################################################
 
-modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
-modelTwo = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True)
-modelThree = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True, sweepUpMass = True)
-modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
-modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
-modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
-# modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
-# modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
-# modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
-# modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
-# modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
-# modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
-# modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
-# modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
+# modelOne = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True)
+# modelTwo = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True)
+# modelThree = model(r"$\lambda_{\rm CR}$: 0.1 pc", meanFreePath = 0.1, radiationPressure = True, windPressure = True, ionPressure = True, sweepUpMass = True)
+# modelFour = model(r"$\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = True, windPressure = True)
+# modelFive = model(r"$\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = True, windPressure = True)
+# modelSix = model(r"$\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = True, windPressure = True)
+# # modelSeven = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", radiationPressure = False)
+# # modelEight = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, radiationPressure = False)
+# # modelNine = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, radiationPressure = False)
+# # modelTen = model(r"No radiation, $\lambda_{\rm CR}$: 0.01 pc", sweepUpMass = True, radiationPressure = False)
+# # modelEleven = model(r"No radiation, $\lambda_{\rm CR}$: 0.03 pc", meanFreePath = 0.03, sweepUpMass = True, radiationPressure = False)
+# # modelTwelve = model(r"No radiation, $\lambda_{\rm CR}$: 0.007 pc", meanFreePath = 0.007, sweepUpMass = True, radiationPressure = False)
+# # modelFour = model("lambda CR: 0.07 pc", meanFreePath = 0.07)
+# # modelFive = model("lambda CR: 0.1 pc", meanFreePath = 0.1)
 
-regionOne = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5, massNewStars = 10**4)
-regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**4)
-regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**4)
+# regionOne = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**5, massNewStars = 10**4)
+# regionTwo = region(r"MShell: $10^5$ $M_\odot$", massShell = 10**4)
+# regionThree = region(r"MShell: $10^6$ $M_\odot$", massShell = 10**4)
 
-modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
-regionList = [regionOne,regionTwo,regionThree]
+# modelList = [modelOne, modelTwo, modelThree, modelFour, modelFive, modelSix]
+# regionList = [regionOne,regionTwo,regionThree]
 
 # modelList = [modelOne]
 # regionList = [regionOne]
 
-resultList = []
+# resultList = []
 
-for currentModel in modelList:
-    for currentRegion in regionList:
-        currentResult = results(currentModel, currentRegion)
-        resultList.append(currentResult)
+# for currentModel in modelList:
+#     for currentRegion in regionList:
+#         currentResult = results(currentModel, currentRegion)
+#         resultList.append(currentResult)
 
-resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
-resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
+# resultList[0].multiPlot("radius", "velocity", resultList[1:-1], scale = "log")
+# resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
 
-# for res in resultList:
-#     res.verify()
+# # for res in resultList:
+# #     res.verify()
 
 
-# # %%
-# # Plot results
-# for res in resultList:
-#     res.plot("radius", "velocity", scale = "symlog")
+# # # %%
+# # # Plot results
+# # for res in resultList:
+# #     res.plot("radius", "velocity", scale = "symlog")
 
 
 ## energyInjection = (res.model.windToCREnergyFraction * res.region.energyDotWind / (4 * math.pi * res.radius**3 * res.velocity)).cgs
@@ -790,6 +798,70 @@ resultList[0].multiPlot("time", "velocity", resultList[1:-1], scale = "log")
 
 # Plots
 ###############################################################################
+
+# %%
+# Plot forces
+###################################################
+
+modelAllForces = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+rSpan = [2, 3, 5, 10, 30, 50]
+
+region30 = region("Mshell = 10^3 Msun", massShell=10**3)
+region32 = region("Mshell = 10^3.2 Msun", massShell=10**3.2)
+region34 = region("Mshell = 10^3.4 Msun", massShell=10**3.4)
+region36 = region("Mshell = 10^3.6 Msun", massShell=10**3.6)
+region38 = region("Mshell = 10^3.8 Msun", massShell=10**3.8)
+region40 = region("Mshell = 10^4 Msun", massShell=10**4)
+region42 = region("Mshell = 10^4.2 Msun", massShell=10**4.2)
+region44 = region("Mshell = 10^4.4 Msun", massShell=10**4.4)
+region46 = region("Mshell = 10^4.6 Msun", massShell=10**4.6)
+region48 = region("Mshell = 10^4.8 Msun", massShell=10**4.8)
+region50 = region("Mshell = 10^5 Msun", massShell=10**5)
+
+region30.calculateTau(modelAllForces, rSpan)
+region32.calculateTau(modelAllForces, rSpan)
+region34.calculateTau(modelAllForces, rSpan)
+region36.calculateTau(modelAllForces, rSpan)
+region38.calculateTau(modelAllForces, rSpan)
+region40.calculateTau(modelAllForces, rSpan)
+region42.calculateTau(modelAllForces, rSpan)
+region44.calculateTau(modelAllForces, rSpan)
+region46.calculateTau(modelAllForces, rSpan)
+region48.calculateTau(modelAllForces, rSpan)
+region50.calculateTau(modelAllForces, rSpan)
+
+forces30, pressures30 = calculateForce(modelAllForces, region30, rSpan)
+forces32, pressures32 = calculateForce(modelAllForces, region32, rSpan)
+forces34, pressures34 = calculateForce(modelAllForces, region34, rSpan)
+forces36, pressures36 = calculateForce(modelAllForces, region36, rSpan)
+forces38, pressures38 = calculateForce(modelAllForces, region38, rSpan)
+forces40, pressures40 = calculateForce(modelAllForces, region40, rSpan)
+forces42, pressures42 = calculateForce(modelAllForces, region42, rSpan)
+forces44, pressures44 = calculateForce(modelAllForces, region44, rSpan)
+forces46, pressures46 = calculateForce(modelAllForces, region46, rSpan)
+forces48, pressures48 = calculateForce(modelAllForces, region48, rSpan)
+forces50, pressures50 = calculateForce(modelAllForces, region50, rSpan)
+
+
+plt.figure(dpi = 200, facecolor = "white")
+
+plt.plot(rSpan, forces30.total, label = r"$10^3$")
+plt.plot(rSpan, forces32.total, label = r"$10^{3.2}$")
+plt.plot(rSpan, forces34.total, label = r"$10^{3.4}$")
+plt.plot(rSpan, forces36.total, label = r"$10^{3.6}$")
+plt.plot(rSpan, forces38.total, label = r"$10^{3.8}$")
+plt.plot(rSpan, forces40.total, label = r"$10^4$")
+plt.plot(rSpan, forces42.total, label = r"$10^{4.2}$")
+plt.plot(rSpan, forces44.total, label = r"$10^{4.4}$")
+plt.plot(rSpan, forces46.total, label = r"$10^{4.6}$")
+plt.plot(rSpan, forces48.total, label = r"$10^{4.8}$")
+plt.plot(rSpan, forces50.total, 'k', label = r"$10^5$")
+
+plt.xlabel("Radius (pc)")
+plt.ylabel("Force (dyn)")
+
+plt.legend(title = r"$M_{\rm sh}\, (M_\odot)$")
+
 
 # %%
 # Plot radius and time dependent velocity
