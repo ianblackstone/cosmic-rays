@@ -806,427 +806,427 @@ testRegion = region("Test Region")
 modelAllForces = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
 rSpan = [2, 3, 5, 10, 30, 50]
 
-region30 = region("Mshell = 10^3 Msun", massShell=10**3)
-region32 = region("Mshell = 10^3.2 Msun", massShell=10**3.2)
-region34 = region("Mshell = 10^3.4 Msun", massShell=10**3.4)
-region36 = region("Mshell = 10^3.6 Msun", massShell=10**3.6)
-region38 = region("Mshell = 10^3.8 Msun", massShell=10**3.8)
-region40 = region("Mshell = 10^4 Msun", massShell=10**4)
-region42 = region("Mshell = 10^4.2 Msun", massShell=10**4.2)
-region44 = region("Mshell = 10^4.4 Msun", massShell=10**4.4)
-region46 = region("Mshell = 10^4.6 Msun", massShell=10**4.6)
-region48 = region("Mshell = 10^4.8 Msun", massShell=10**4.8)
-region50 = region("Mshell = 10^5 Msun", massShell=10**5)
+# region30 = region("Mshell = 10^3 Msun", massShell=10**3)
+# region32 = region("Mshell = 10^3.2 Msun", massShell=10**3.2)
+# region34 = region("Mshell = 10^3.4 Msun", massShell=10**3.4)
+# region36 = region("Mshell = 10^3.6 Msun", massShell=10**3.6)
+# region38 = region("Mshell = 10^3.8 Msun", massShell=10**3.8)
+# region40 = region("Mshell = 10^4 Msun", massShell=10**4)
+# region42 = region("Mshell = 10^4.2 Msun", massShell=10**4.2)
+# region44 = region("Mshell = 10^4.4 Msun", massShell=10**4.4)
+# region46 = region("Mshell = 10^4.6 Msun", massShell=10**4.6)
+# region48 = region("Mshell = 10^4.8 Msun", massShell=10**4.8)
+# region50 = region("Mshell = 10^5 Msun", massShell=10**5)
 
-region30.calculateTau(modelAllForces, rSpan)
-region32.calculateTau(modelAllForces, rSpan)
-region34.calculateTau(modelAllForces, rSpan)
-region36.calculateTau(modelAllForces, rSpan)
-region38.calculateTau(modelAllForces, rSpan)
-region40.calculateTau(modelAllForces, rSpan)
-region42.calculateTau(modelAllForces, rSpan)
-region44.calculateTau(modelAllForces, rSpan)
-region46.calculateTau(modelAllForces, rSpan)
-region48.calculateTau(modelAllForces, rSpan)
-region50.calculateTau(modelAllForces, rSpan)
+# region30.calculateTau(modelAllForces, rSpan)
+# region32.calculateTau(modelAllForces, rSpan)
+# region34.calculateTau(modelAllForces, rSpan)
+# region36.calculateTau(modelAllForces, rSpan)
+# region38.calculateTau(modelAllForces, rSpan)
+# region40.calculateTau(modelAllForces, rSpan)
+# region42.calculateTau(modelAllForces, rSpan)
+# region44.calculateTau(modelAllForces, rSpan)
+# region46.calculateTau(modelAllForces, rSpan)
+# region48.calculateTau(modelAllForces, rSpan)
+# region50.calculateTau(modelAllForces, rSpan)
 
-forces30, pressures30 = calculateForce(modelAllForces, region30, rSpan)
-forces32, pressures32 = calculateForce(modelAllForces, region32, rSpan)
-forces34, pressures34 = calculateForce(modelAllForces, region34, rSpan)
-forces36, pressures36 = calculateForce(modelAllForces, region36, rSpan)
-forces38, pressures38 = calculateForce(modelAllForces, region38, rSpan)
-forces40, pressures40 = calculateForce(modelAllForces, region40, rSpan)
-forces42, pressures42 = calculateForce(modelAllForces, region42, rSpan)
-forces44, pressures44 = calculateForce(modelAllForces, region44, rSpan)
-forces46, pressures46 = calculateForce(modelAllForces, region46, rSpan)
-forces48, pressures48 = calculateForce(modelAllForces, region48, rSpan)
-forces50, pressures50 = calculateForce(modelAllForces, region50, rSpan)
-
-
-plt.figure(dpi = 200, facecolor = "white")
-
-plt.plot(rSpan, forces30.total, label = r"$10^3$")
-plt.plot(rSpan, forces32.total, label = r"$10^{3.2}$")
-plt.plot(rSpan, forces34.total, label = r"$10^{3.4}$")
-plt.plot(rSpan, forces36.total, label = r"$10^{3.6}$")
-plt.plot(rSpan, forces38.total, label = r"$10^{3.8}$")
-plt.plot(rSpan, forces40.total, label = r"$10^4$")
-plt.plot(rSpan, forces42.total, label = r"$10^{4.2}$")
-plt.plot(rSpan, forces44.total, label = r"$10^{4.4}$")
-plt.plot(rSpan, forces46.total, label = r"$10^{4.6}$")
-plt.plot(rSpan, forces48.total, label = r"$10^{4.8}$")
-plt.plot(rSpan, forces50.total, 'k', label = r"$10^5$")
-
-plt.xlabel("Radius (pc)")
-plt.ylabel("Force (dyn)")
-
-plt.legend(title = r"$M_{\rm sh}\, (M_\odot)$")
+# forces30, pressures30 = calculateForce(modelAllForces, region30, rSpan)
+# forces32, pressures32 = calculateForce(modelAllForces, region32, rSpan)
+# forces34, pressures34 = calculateForce(modelAllForces, region34, rSpan)
+# forces36, pressures36 = calculateForce(modelAllForces, region36, rSpan)
+# forces38, pressures38 = calculateForce(modelAllForces, region38, rSpan)
+# forces40, pressures40 = calculateForce(modelAllForces, region40, rSpan)
+# forces42, pressures42 = calculateForce(modelAllForces, region42, rSpan)
+# forces44, pressures44 = calculateForce(modelAllForces, region44, rSpan)
+# forces46, pressures46 = calculateForce(modelAllForces, region46, rSpan)
+# forces48, pressures48 = calculateForce(modelAllForces, region48, rSpan)
+# forces50, pressures50 = calculateForce(modelAllForces, region50, rSpan)
 
 
-# %%
-# Whatever the hell this is
-###################################################
+# plt.figure(dpi = 200, facecolor = "white")
 
-regionMg30Ms40 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4)
-regionMg32Ms40 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4)
-regionMg34Ms40 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4)
-regionMg36Ms40 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4)
-regionMg38Ms40 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4)
-regionMg40Ms40 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4)
-regionMg42Ms40 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4)
-regionMg44Ms40 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4)
-regionMg46Ms40 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4)
-regionMg48Ms40 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4)
-regionMg50Ms40 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4)
+# plt.plot(rSpan, forces30.total, label = r"$10^3$")
+# plt.plot(rSpan, forces32.total, label = r"$10^{3.2}$")
+# plt.plot(rSpan, forces34.total, label = r"$10^{3.4}$")
+# plt.plot(rSpan, forces36.total, label = r"$10^{3.6}$")
+# plt.plot(rSpan, forces38.total, label = r"$10^{3.8}$")
+# plt.plot(rSpan, forces40.total, label = r"$10^4$")
+# plt.plot(rSpan, forces42.total, label = r"$10^{4.2}$")
+# plt.plot(rSpan, forces44.total, label = r"$10^{4.4}$")
+# plt.plot(rSpan, forces46.total, label = r"$10^{4.6}$")
+# plt.plot(rSpan, forces48.total, label = r"$10^{4.8}$")
+# plt.plot(rSpan, forces50.total, 'k', label = r"$10^5$")
 
-regionMg30Ms40.calculateTau(modelAllForces, rSpan)
-regionMg32Ms40.calculateTau(modelAllForces, rSpan)
-regionMg34Ms40.calculateTau(modelAllForces, rSpan)
-regionMg36Ms40.calculateTau(modelAllForces, rSpan)
-regionMg38Ms40.calculateTau(modelAllForces, rSpan)
-regionMg40Ms40.calculateTau(modelAllForces, rSpan)
-regionMg42Ms40.calculateTau(modelAllForces, rSpan)
-regionMg44Ms40.calculateTau(modelAllForces, rSpan)
-regionMg46Ms40.calculateTau(modelAllForces, rSpan)
-regionMg48Ms40.calculateTau(modelAllForces, rSpan)
-regionMg50Ms40.calculateTau(modelAllForces, rSpan)
+# plt.xlabel("Radius (pc)")
+# plt.ylabel("Force (dyn)")
 
-forcesMg30Ms40, pressuresMg30Ms40 = calculateForce(modelAllForces, regionMg30Ms40, rSpan)
-forcesMg32Ms40, pressuresMg32Ms40 = calculateForce(modelAllForces, regionMg32Ms40, rSpan)
-forcesMg34Ms40, pressuresMg34Ms40 = calculateForce(modelAllForces, regionMg34Ms40, rSpan)
-forcesMg36Ms40, pressuresMg36Ms40 = calculateForce(modelAllForces, regionMg36Ms40, rSpan)
-forcesMg38Ms40, pressuresMg38Ms40 = calculateForce(modelAllForces, regionMg38Ms40, rSpan)
-forcesMg40Ms40, pressuresMg40Ms40 = calculateForce(modelAllForces, regionMg40Ms40, rSpan)
-forcesMg42Ms40, pressuresMg42Ms40 = calculateForce(modelAllForces, regionMg42Ms40, rSpan)
-forcesMg44Ms40, pressuresMg44Ms40 = calculateForce(modelAllForces, regionMg44Ms40, rSpan)
-forcesMg46Ms40, pressuresMg46Ms40 = calculateForce(modelAllForces, regionMg46Ms40, rSpan)
-forcesMg48Ms40, pressuresMg48Ms40 = calculateForce(modelAllForces, regionMg48Ms40, rSpan)
-forcesMg50Ms40, pressuresMg50Ms40 = calculateForce(modelAllForces, regionMg50Ms40, rSpan)
-
-regionMg30Ms42 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.2)
-regionMg32Ms42 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.2)
-regionMg34Ms42 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.2)
-regionMg36Ms42 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.2)
-regionMg38Ms42 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.2)
-regionMg40Ms42 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.2)
-regionMg42Ms42 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.2)
-regionMg44Ms42 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.2)
-regionMg46Ms42 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.2)
-regionMg48Ms42 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.2)
-regionMg50Ms42 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.2)
-
-regionMg30Ms42.calculateTau(modelAllForces, rSpan)
-regionMg32Ms42.calculateTau(modelAllForces, rSpan)
-regionMg34Ms42.calculateTau(modelAllForces, rSpan)
-regionMg36Ms42.calculateTau(modelAllForces, rSpan)
-regionMg38Ms42.calculateTau(modelAllForces, rSpan)
-regionMg40Ms42.calculateTau(modelAllForces, rSpan)
-regionMg42Ms42.calculateTau(modelAllForces, rSpan)
-regionMg44Ms42.calculateTau(modelAllForces, rSpan)
-regionMg46Ms42.calculateTau(modelAllForces, rSpan)
-regionMg48Ms42.calculateTau(modelAllForces, rSpan)
-regionMg50Ms42.calculateTau(modelAllForces, rSpan)
-
-forcesMg30Ms42, pressuresMg30Ms42 = calculateForce(modelAllForces, regionMg30Ms42, rSpan)
-forcesMg32Ms42, pressuresMg32Ms42 = calculateForce(modelAllForces, regionMg32Ms42, rSpan)
-forcesMg34Ms42, pressuresMg34Ms42 = calculateForce(modelAllForces, regionMg34Ms42, rSpan)
-forcesMg36Ms42, pressuresMg36Ms42 = calculateForce(modelAllForces, regionMg36Ms42, rSpan)
-forcesMg38Ms42, pressuresMg38Ms42 = calculateForce(modelAllForces, regionMg38Ms42, rSpan)
-forcesMg40Ms42, pressuresMg40Ms42 = calculateForce(modelAllForces, regionMg40Ms42, rSpan)
-forcesMg42Ms42, pressuresMg42Ms42 = calculateForce(modelAllForces, regionMg42Ms42, rSpan)
-forcesMg44Ms42, pressuresMg44Ms42 = calculateForce(modelAllForces, regionMg44Ms42, rSpan)
-forcesMg46Ms42, pressuresMg46Ms42 = calculateForce(modelAllForces, regionMg46Ms42, rSpan)
-forcesMg48Ms42, pressuresMg48Ms42 = calculateForce(modelAllForces, regionMg48Ms42, rSpan)
-forcesMg50Ms42, pressuresMg50Ms42 = calculateForce(modelAllForces, regionMg50Ms42, rSpan)
-
-regionMg30Ms44 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.4)
-regionMg32Ms44 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.4)
-regionMg34Ms44 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.4)
-regionMg36Ms44 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.4)
-regionMg38Ms44 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.4)
-regionMg40Ms44 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.4)
-regionMg42Ms44 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.4)
-regionMg44Ms44 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.4)
-regionMg46Ms44 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.4)
-regionMg48Ms44 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.4)
-regionMg50Ms44 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.4)
-
-regionMg30Ms44.calculateTau(modelAllForces, rSpan)
-regionMg32Ms44.calculateTau(modelAllForces, rSpan)
-regionMg34Ms44.calculateTau(modelAllForces, rSpan)
-regionMg36Ms44.calculateTau(modelAllForces, rSpan)
-regionMg38Ms44.calculateTau(modelAllForces, rSpan)
-regionMg40Ms44.calculateTau(modelAllForces, rSpan)
-regionMg42Ms44.calculateTau(modelAllForces, rSpan)
-regionMg44Ms44.calculateTau(modelAllForces, rSpan)
-regionMg46Ms44.calculateTau(modelAllForces, rSpan)
-regionMg48Ms44.calculateTau(modelAllForces, rSpan)
-regionMg50Ms44.calculateTau(modelAllForces, rSpan)
-
-forcesMg30Ms44, pressuresMg30Ms44 = calculateForce(modelAllForces, regionMg30Ms44, rSpan)
-forcesMg32Ms44, pressuresMg32Ms44 = calculateForce(modelAllForces, regionMg32Ms44, rSpan)
-forcesMg34Ms44, pressuresMg34Ms44 = calculateForce(modelAllForces, regionMg34Ms44, rSpan)
-forcesMg36Ms44, pressuresMg36Ms44 = calculateForce(modelAllForces, regionMg36Ms44, rSpan)
-forcesMg38Ms44, pressuresMg38Ms44 = calculateForce(modelAllForces, regionMg38Ms44, rSpan)
-forcesMg40Ms44, pressuresMg40Ms44 = calculateForce(modelAllForces, regionMg40Ms44, rSpan)
-forcesMg42Ms44, pressuresMg42Ms44 = calculateForce(modelAllForces, regionMg42Ms44, rSpan)
-forcesMg44Ms44, pressuresMg44Ms44 = calculateForce(modelAllForces, regionMg44Ms44, rSpan)
-forcesMg46Ms44, pressuresMg46Ms44 = calculateForce(modelAllForces, regionMg46Ms44, rSpan)
-forcesMg48Ms44, pressuresMg48Ms44 = calculateForce(modelAllForces, regionMg48Ms44, rSpan)
-forcesMg50Ms44, pressuresMg50Ms44 = calculateForce(modelAllForces, regionMg50Ms44, rSpan)
-
-regionMg30Ms46 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.6)
-regionMg32Ms46 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.6)
-regionMg34Ms46 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.6)
-regionMg36Ms46 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.6)
-regionMg38Ms46 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.6)
-regionMg40Ms46 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.6)
-regionMg42Ms46 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.6)
-regionMg44Ms46 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.6)
-regionMg46Ms46 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.6)
-regionMg48Ms46 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.6)
-regionMg50Ms46 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.6)
-
-regionMg30Ms46.calculateTau(modelAllForces, rSpan)
-regionMg32Ms46.calculateTau(modelAllForces, rSpan)
-regionMg34Ms46.calculateTau(modelAllForces, rSpan)
-regionMg36Ms46.calculateTau(modelAllForces, rSpan)
-regionMg38Ms46.calculateTau(modelAllForces, rSpan)
-regionMg40Ms46.calculateTau(modelAllForces, rSpan)
-regionMg42Ms46.calculateTau(modelAllForces, rSpan)
-regionMg44Ms46.calculateTau(modelAllForces, rSpan)
-regionMg46Ms46.calculateTau(modelAllForces, rSpan)
-regionMg48Ms46.calculateTau(modelAllForces, rSpan)
-regionMg50Ms46.calculateTau(modelAllForces, rSpan)
-
-forcesMg30Ms46, pressuresMg30Ms46 = calculateForce(modelAllForces, regionMg30Ms46, rSpan)
-forcesMg32Ms46, pressuresMg32Ms46 = calculateForce(modelAllForces, regionMg32Ms46, rSpan)
-forcesMg34Ms46, pressuresMg34Ms46 = calculateForce(modelAllForces, regionMg34Ms46, rSpan)
-forcesMg36Ms46, pressuresMg36Ms46 = calculateForce(modelAllForces, regionMg36Ms46, rSpan)
-forcesMg38Ms46, pressuresMg38Ms46 = calculateForce(modelAllForces, regionMg38Ms46, rSpan)
-forcesMg40Ms46, pressuresMg40Ms46 = calculateForce(modelAllForces, regionMg40Ms46, rSpan)
-forcesMg42Ms46, pressuresMg42Ms46 = calculateForce(modelAllForces, regionMg42Ms46, rSpan)
-forcesMg44Ms46, pressuresMg44Ms46 = calculateForce(modelAllForces, regionMg44Ms46, rSpan)
-forcesMg46Ms46, pressuresMg46Ms46 = calculateForce(modelAllForces, regionMg46Ms46, rSpan)
-forcesMg48Ms46, pressuresMg48Ms46 = calculateForce(modelAllForces, regionMg48Ms46, rSpan)
-forcesMg50Ms46, pressuresMg50Ms46 = calculateForce(modelAllForces, regionMg50Ms46, rSpan)
-
-regionMg30Ms48 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.8)
-regionMg32Ms48 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.8)
-regionMg34Ms48 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.8)
-regionMg36Ms48 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.8)
-regionMg38Ms48 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.8)
-regionMg40Ms48 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.8)
-regionMg42Ms48 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.8)
-regionMg44Ms48 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.8)
-regionMg46Ms48 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.8)
-regionMg48Ms48 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.8)
-regionMg50Ms48 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.8)
-
-regionMg30Ms48.calculateTau(modelAllForces, rSpan)
-regionMg32Ms48.calculateTau(modelAllForces, rSpan)
-regionMg34Ms48.calculateTau(modelAllForces, rSpan)
-regionMg36Ms48.calculateTau(modelAllForces, rSpan)
-regionMg38Ms48.calculateTau(modelAllForces, rSpan)
-regionMg40Ms48.calculateTau(modelAllForces, rSpan)
-regionMg42Ms48.calculateTau(modelAllForces, rSpan)
-regionMg44Ms48.calculateTau(modelAllForces, rSpan)
-regionMg46Ms48.calculateTau(modelAllForces, rSpan)
-regionMg48Ms48.calculateTau(modelAllForces, rSpan)
-regionMg50Ms48.calculateTau(modelAllForces, rSpan)
-
-forcesMg30Ms48, pressuresMg30Ms48 = calculateForce(modelAllForces, regionMg30Ms48, rSpan)
-forcesMg32Ms48, pressuresMg32Ms48 = calculateForce(modelAllForces, regionMg32Ms48, rSpan)
-forcesMg34Ms48, pressuresMg34Ms48 = calculateForce(modelAllForces, regionMg34Ms48, rSpan)
-forcesMg36Ms48, pressuresMg36Ms48 = calculateForce(modelAllForces, regionMg36Ms48, rSpan)
-forcesMg38Ms48, pressuresMg38Ms48 = calculateForce(modelAllForces, regionMg38Ms48, rSpan)
-forcesMg40Ms48, pressuresMg40Ms48 = calculateForce(modelAllForces, regionMg40Ms48, rSpan)
-forcesMg42Ms48, pressuresMg42Ms48 = calculateForce(modelAllForces, regionMg42Ms48, rSpan)
-forcesMg44Ms48, pressuresMg44Ms48 = calculateForce(modelAllForces, regionMg44Ms48, rSpan)
-forcesMg46Ms48, pressuresMg46Ms48 = calculateForce(modelAllForces, regionMg46Ms48, rSpan)
-forcesMg48Ms48, pressuresMg48Ms48 = calculateForce(modelAllForces, regionMg48Ms48, rSpan)
-forcesMg50Ms48, pressuresMg50Ms48 = calculateForce(modelAllForces, regionMg50Ms48, rSpan)
-
-regionMg30Ms50 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**5)
-regionMg32Ms50 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**5)
-regionMg34Ms50 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**5)
-regionMg36Ms50 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**5)
-regionMg38Ms50 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**5)
-regionMg40Ms50 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**5)
-regionMg42Ms50 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**5)
-regionMg44Ms50 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**5)
-regionMg46Ms50 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**5)
-regionMg48Ms50 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**5)
-regionMg50Ms50 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**5)
-
-regionMg30Ms50.calculateTau(modelAllForces, rSpan)
-regionMg32Ms50.calculateTau(modelAllForces, rSpan)
-regionMg34Ms50.calculateTau(modelAllForces, rSpan)
-regionMg36Ms50.calculateTau(modelAllForces, rSpan)
-regionMg38Ms50.calculateTau(modelAllForces, rSpan)
-regionMg40Ms50.calculateTau(modelAllForces, rSpan)
-regionMg42Ms50.calculateTau(modelAllForces, rSpan)
-regionMg44Ms50.calculateTau(modelAllForces, rSpan)
-regionMg46Ms50.calculateTau(modelAllForces, rSpan)
-regionMg48Ms50.calculateTau(modelAllForces, rSpan)
-regionMg50Ms50.calculateTau(modelAllForces, rSpan)
-
-forcesMg30Ms50, pressuresMg30Ms50 = calculateForce(modelAllForces, regionMg30Ms50, rSpan)
-forcesMg32Ms50, pressuresMg32Ms50 = calculateForce(modelAllForces, regionMg32Ms50, rSpan)
-forcesMg34Ms50, pressuresMg34Ms50 = calculateForce(modelAllForces, regionMg34Ms50, rSpan)
-forcesMg36Ms50, pressuresMg36Ms50 = calculateForce(modelAllForces, regionMg36Ms50, rSpan)
-forcesMg38Ms50, pressuresMg38Ms50 = calculateForce(modelAllForces, regionMg38Ms50, rSpan)
-forcesMg40Ms50, pressuresMg40Ms50 = calculateForce(modelAllForces, regionMg40Ms50, rSpan)
-forcesMg42Ms50, pressuresMg42Ms50 = calculateForce(modelAllForces, regionMg42Ms50, rSpan)
-forcesMg44Ms50, pressuresMg44Ms50 = calculateForce(modelAllForces, regionMg44Ms50, rSpan)
-forcesMg46Ms50, pressuresMg46Ms50 = calculateForce(modelAllForces, regionMg46Ms50, rSpan)
-forcesMg48Ms50, pressuresMg48Ms50 = calculateForce(modelAllForces, regionMg48Ms50, rSpan)
-forcesMg50Ms50, pressuresMg50Ms50 = calculateForce(modelAllForces, regionMg50Ms50, rSpan)
+# plt.legend(title = r"$M_{\rm sh}\, (M_\odot)$")
 
 
-forcesMg30Ms50.massNewStars = 5.0
-forcesMg30Ms50.massShell = 3.0
-forcesMg32Ms50.massNewStars = 5.0
-forcesMg32Ms50.massShell = 3.2
-forcesMg34Ms50.massNewStars = 5.0
-forcesMg34Ms50.massShell = 3.4
-forcesMg36Ms50.massNewStars = 5.0
-forcesMg36Ms50.massShell = 3.6
-forcesMg38Ms50.massNewStars = 5.0
-forcesMg38Ms50.massShell = 3.8
-forcesMg40Ms50.massNewStars = 5.0
-forcesMg40Ms50.massShell = 4.0
-forcesMg42Ms50.massNewStars = 5.0
-forcesMg42Ms50.massShell = 4.2
-forcesMg44Ms50.massNewStars = 5.0
-forcesMg44Ms50.massShell = 4.4
-forcesMg46Ms50.massNewStars = 5.0
-forcesMg46Ms50.massShell = 4.6
-forcesMg48Ms50.massNewStars = 5.0
-forcesMg48Ms50.massShell = 4.8
-forcesMg50Ms50.massNewStars = 5.0
-forcesMg50Ms50.massShell = 5.0
+# # %%
+# # Whatever the hell this is
+# ###################################################
 
-forcesMg30Ms48.massNewStars = 4.8
-forcesMg30Ms48.massShell = 3.0
-forcesMg32Ms48.massNewStars = 4.8
-forcesMg32Ms48.massShell = 3.2
-forcesMg34Ms48.massNewStars = 4.8
-forcesMg34Ms48.massShell = 3.4
-forcesMg36Ms48.massNewStars = 4.8
-forcesMg36Ms48.massShell = 3.6
-forcesMg38Ms48.massNewStars = 4.8
-forcesMg38Ms48.massShell = 3.8
-forcesMg40Ms48.massNewStars = 4.8
-forcesMg40Ms48.massShell = 4.0
-forcesMg42Ms48.massNewStars = 4.8
-forcesMg42Ms48.massShell = 4.2
-forcesMg44Ms48.massNewStars = 4.8
-forcesMg44Ms48.massShell = 4.4
-forcesMg46Ms48.massNewStars = 4.8
-forcesMg46Ms48.massShell = 4.6
-forcesMg48Ms48.massNewStars = 4.8
-forcesMg48Ms48.massShell = 4.8
-forcesMg50Ms48.massNewStars = 4.8
-forcesMg50Ms48.massShell = 5.0
+# regionMg30Ms40 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4)
+# regionMg32Ms40 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4)
+# regionMg34Ms40 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4)
+# regionMg36Ms40 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4)
+# regionMg38Ms40 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4)
+# regionMg40Ms40 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4)
+# regionMg42Ms40 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4)
+# regionMg44Ms40 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4)
+# regionMg46Ms40 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4)
+# regionMg48Ms40 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4)
+# regionMg50Ms40 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4)
 
-forcesMg30Ms46.massNewStars = 4.6
-forcesMg30Ms46.massShell = 3.0
-forcesMg32Ms46.massNewStars = 4.6
-forcesMg32Ms46.massShell = 3.2
-forcesMg34Ms46.massNewStars = 4.6
-forcesMg34Ms46.massShell = 3.4
-forcesMg36Ms46.massNewStars = 4.6
-forcesMg36Ms46.massShell = 3.6
-forcesMg38Ms46.massNewStars = 4.6
-forcesMg38Ms46.massShell = 3.8
-forcesMg40Ms46.massNewStars = 4.6
-forcesMg40Ms46.massShell = 4.0
-forcesMg42Ms46.massNewStars = 4.6
-forcesMg42Ms46.massShell = 4.2
-forcesMg44Ms46.massNewStars = 4.6
-forcesMg44Ms46.massShell = 4.4
-forcesMg46Ms46.massNewStars = 4.6
-forcesMg46Ms46.massShell = 4.6
-forcesMg48Ms46.massNewStars = 4.6
-forcesMg48Ms46.massShell = 4.8
-forcesMg50Ms46.massNewStars = 4.6
-forcesMg50Ms46.massShell = 5.0
+# regionMg30Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg32Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg34Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg36Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg38Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg40Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg42Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg44Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg46Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg48Ms40.calculateTau(modelAllForces, rSpan)
+# regionMg50Ms40.calculateTau(modelAllForces, rSpan)
 
-forcesMg30Ms44.massNewStars = 4.4
-forcesMg30Ms44.massShell = 3.0
-forcesMg32Ms44.massNewStars = 4.4
-forcesMg32Ms44.massShell = 3.2
-forcesMg34Ms44.massNewStars = 4.4
-forcesMg34Ms44.massShell = 3.4
-forcesMg36Ms44.massNewStars = 4.4
-forcesMg36Ms44.massShell = 3.6
-forcesMg38Ms44.massNewStars = 4.4
-forcesMg38Ms44.massShell = 3.8
-forcesMg40Ms44.massNewStars = 4.4
-forcesMg40Ms44.massShell = 4.0
-forcesMg42Ms44.massNewStars = 4.4
-forcesMg42Ms44.massShell = 4.2
-forcesMg44Ms44.massNewStars = 4.4
-forcesMg44Ms44.massShell = 4.4
-forcesMg46Ms44.massNewStars = 4.4
-forcesMg46Ms44.massShell = 4.6
-forcesMg48Ms44.massNewStars = 4.4
-forcesMg48Ms44.massShell = 4.8
-forcesMg50Ms44.massNewStars = 4.4
-forcesMg50Ms44.massShell = 5.0
+# forcesMg30Ms40, pressuresMg30Ms40 = calculateForce(modelAllForces, regionMg30Ms40, rSpan)
+# forcesMg32Ms40, pressuresMg32Ms40 = calculateForce(modelAllForces, regionMg32Ms40, rSpan)
+# forcesMg34Ms40, pressuresMg34Ms40 = calculateForce(modelAllForces, regionMg34Ms40, rSpan)
+# forcesMg36Ms40, pressuresMg36Ms40 = calculateForce(modelAllForces, regionMg36Ms40, rSpan)
+# forcesMg38Ms40, pressuresMg38Ms40 = calculateForce(modelAllForces, regionMg38Ms40, rSpan)
+# forcesMg40Ms40, pressuresMg40Ms40 = calculateForce(modelAllForces, regionMg40Ms40, rSpan)
+# forcesMg42Ms40, pressuresMg42Ms40 = calculateForce(modelAllForces, regionMg42Ms40, rSpan)
+# forcesMg44Ms40, pressuresMg44Ms40 = calculateForce(modelAllForces, regionMg44Ms40, rSpan)
+# forcesMg46Ms40, pressuresMg46Ms40 = calculateForce(modelAllForces, regionMg46Ms40, rSpan)
+# forcesMg48Ms40, pressuresMg48Ms40 = calculateForce(modelAllForces, regionMg48Ms40, rSpan)
+# forcesMg50Ms40, pressuresMg50Ms40 = calculateForce(modelAllForces, regionMg50Ms40, rSpan)
 
-forcesMg30Ms42.massNewStars = 4.2
-forcesMg30Ms42.massShell = 3.0
-forcesMg32Ms42.massNewStars = 4.2
-forcesMg32Ms42.massShell = 3.2
-forcesMg34Ms42.massNewStars = 4.2
-forcesMg34Ms42.massShell = 3.4
-forcesMg36Ms42.massNewStars = 4.2
-forcesMg36Ms42.massShell = 3.6
-forcesMg38Ms42.massNewStars = 4.2
-forcesMg38Ms42.massShell = 3.8
-forcesMg40Ms42.massNewStars = 4.2
-forcesMg40Ms42.massShell = 4.0
-forcesMg42Ms42.massNewStars = 4.2
-forcesMg42Ms42.massShell = 4.2
-forcesMg44Ms42.massNewStars = 4.2
-forcesMg44Ms42.massShell = 4.4
-forcesMg46Ms42.massNewStars = 4.2
-forcesMg46Ms42.massShell = 4.6
-forcesMg48Ms42.massNewStars = 4.2
-forcesMg48Ms42.massShell = 4.8
-forcesMg50Ms42.massNewStars = 4.2
-forcesMg50Ms42.massShell = 5.0
+# regionMg30Ms42 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.2)
+# regionMg32Ms42 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.2)
+# regionMg34Ms42 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.2)
+# regionMg36Ms42 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.2)
+# regionMg38Ms42 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.2)
+# regionMg40Ms42 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.2)
+# regionMg42Ms42 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.2)
+# regionMg44Ms42 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.2)
+# regionMg46Ms42 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.2)
+# regionMg48Ms42 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.2)
+# regionMg50Ms42 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.2)
 
-forcesMg30Ms40.massNewStars = 4.0
-forcesMg30Ms40.massShell = 3.0
-forcesMg32Ms40.massNewStars = 4.0
-forcesMg32Ms40.massShell = 3.2
-forcesMg34Ms40.massNewStars = 4.0
-forcesMg34Ms40.massShell = 3.4
-forcesMg36Ms40.massNewStars = 4.0
-forcesMg36Ms40.massShell = 3.6
-forcesMg38Ms40.massNewStars = 4.0
-forcesMg38Ms40.massShell = 3.8
-forcesMg40Ms40.massNewStars = 4.0
-forcesMg40Ms40.massShell = 4.0
-forcesMg42Ms40.massNewStars = 4.0
-forcesMg42Ms40.massShell = 4.2
-forcesMg44Ms40.massNewStars = 4.0
-forcesMg44Ms40.massShell = 4.4
-forcesMg46Ms40.massNewStars = 4.0
-forcesMg46Ms40.massShell = 4.6
-forcesMg48Ms40.massNewStars = 4.0
-forcesMg48Ms40.massShell = 4.8
-forcesMg50Ms40.massNewStars = 4.0
-forcesMg50Ms40.massShell = 5.0
+# regionMg30Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg32Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg34Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg36Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg38Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg40Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg42Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg44Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg46Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg48Ms42.calculateTau(modelAllForces, rSpan)
+# regionMg50Ms42.calculateTau(modelAllForces, rSpan)
 
-clusterMasses = [4, 4.2, 4.4, 4.6, 4.8, 5]
-shellMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5]
+# forcesMg30Ms42, pressuresMg30Ms42 = calculateForce(modelAllForces, regionMg30Ms42, rSpan)
+# forcesMg32Ms42, pressuresMg32Ms42 = calculateForce(modelAllForces, regionMg32Ms42, rSpan)
+# forcesMg34Ms42, pressuresMg34Ms42 = calculateForce(modelAllForces, regionMg34Ms42, rSpan)
+# forcesMg36Ms42, pressuresMg36Ms42 = calculateForce(modelAllForces, regionMg36Ms42, rSpan)
+# forcesMg38Ms42, pressuresMg38Ms42 = calculateForce(modelAllForces, regionMg38Ms42, rSpan)
+# forcesMg40Ms42, pressuresMg40Ms42 = calculateForce(modelAllForces, regionMg40Ms42, rSpan)
+# forcesMg42Ms42, pressuresMg42Ms42 = calculateForce(modelAllForces, regionMg42Ms42, rSpan)
+# forcesMg44Ms42, pressuresMg44Ms42 = calculateForce(modelAllForces, regionMg44Ms42, rSpan)
+# forcesMg46Ms42, pressuresMg46Ms42 = calculateForce(modelAllForces, regionMg46Ms42, rSpan)
+# forcesMg48Ms42, pressuresMg48Ms42 = calculateForce(modelAllForces, regionMg48Ms42, rSpan)
+# forcesMg50Ms42, pressuresMg50Ms42 = calculateForce(modelAllForces, regionMg50Ms42, rSpan)
 
-forces = [forcesMg30Ms40,forcesMg32Ms40,forcesMg34Ms40,forcesMg36Ms40,forcesMg38Ms40,forcesMg40Ms40,forcesMg42Ms40,forcesMg44Ms40,forcesMg46Ms40,forcesMg48Ms40,forcesMg50Ms40,forcesMg30Ms42,forcesMg32Ms42,forcesMg34Ms42,forcesMg36Ms42,forcesMg38Ms42,forcesMg40Ms42,forcesMg42Ms42,forcesMg44Ms42,forcesMg46Ms42,forcesMg48Ms42,forcesMg50Ms42,forcesMg30Ms44,forcesMg32Ms44,forcesMg34Ms44,forcesMg36Ms44,forcesMg38Ms44,forcesMg40Ms44,forcesMg42Ms44,forcesMg44Ms44,forcesMg46Ms44,forcesMg48Ms44,forcesMg50Ms44,forcesMg30Ms46,forcesMg32Ms46,forcesMg34Ms46,forcesMg36Ms46,forcesMg38Ms46,forcesMg40Ms46,forcesMg42Ms46,forcesMg44Ms46,forcesMg46Ms46,forcesMg48Ms46,forcesMg50Ms46,forcesMg30Ms48,forcesMg32Ms48,forcesMg34Ms48,forcesMg36Ms48,forcesMg38Ms48,forcesMg40Ms48,forcesMg42Ms48,forcesMg44Ms48,forcesMg46Ms48,forcesMg48Ms48,forcesMg50Ms48,forcesMg30Ms50,forcesMg32Ms50,forcesMg34Ms50,forcesMg36Ms50,forcesMg38Ms50,forcesMg40Ms50,forcesMg42Ms50,forcesMg44Ms50,forcesMg46Ms50,forcesMg48Ms50,forcesMg50Ms50]
-regionList = [regionMg30Ms40,regionMg32Ms40,regionMg34Ms40,regionMg36Ms40,regionMg38Ms40,regionMg40Ms40,regionMg42Ms40,regionMg44Ms40,regionMg46Ms40,regionMg48Ms40,regionMg50Ms40,regionMg30Ms42,regionMg32Ms42,regionMg34Ms42,regionMg36Ms42,regionMg38Ms42,regionMg40Ms42,regionMg42Ms42,regionMg44Ms42,regionMg46Ms42,regionMg48Ms42,regionMg50Ms42,regionMg30Ms44,regionMg32Ms44,regionMg34Ms44,regionMg36Ms44,regionMg38Ms44,regionMg40Ms44,regionMg42Ms44,regionMg44Ms44,regionMg46Ms44,regionMg48Ms44,regionMg50Ms44,regionMg30Ms46,regionMg32Ms46,regionMg34Ms46,regionMg36Ms46,regionMg38Ms46,regionMg40Ms46,regionMg42Ms46,regionMg44Ms46,regionMg46Ms46,regionMg48Ms46,regionMg50Ms46,regionMg30Ms48,regionMg32Ms48,regionMg34Ms48,regionMg36Ms48,regionMg38Ms48,regionMg40Ms48,regionMg42Ms48,regionMg44Ms48,regionMg46Ms48,regionMg48Ms48,regionMg50Ms48,regionMg30Ms50,regionMg32Ms50,regionMg34Ms50,regionMg36Ms50,regionMg38Ms50,regionMg40Ms50,regionMg42Ms50,regionMg44Ms50,regionMg46Ms50,regionMg48Ms50,regionMg50Ms50]
+# regionMg30Ms44 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.4)
+# regionMg32Ms44 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.4)
+# regionMg34Ms44 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.4)
+# regionMg36Ms44 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.4)
+# regionMg38Ms44 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.4)
+# regionMg40Ms44 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.4)
+# regionMg42Ms44 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.4)
+# regionMg44Ms44 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.4)
+# regionMg46Ms44 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.4)
+# regionMg48Ms44 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.4)
+# regionMg50Ms44 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.4)
+
+# regionMg30Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg32Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg34Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg36Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg38Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg40Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg42Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg44Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg46Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg48Ms44.calculateTau(modelAllForces, rSpan)
+# regionMg50Ms44.calculateTau(modelAllForces, rSpan)
+
+# forcesMg30Ms44, pressuresMg30Ms44 = calculateForce(modelAllForces, regionMg30Ms44, rSpan)
+# forcesMg32Ms44, pressuresMg32Ms44 = calculateForce(modelAllForces, regionMg32Ms44, rSpan)
+# forcesMg34Ms44, pressuresMg34Ms44 = calculateForce(modelAllForces, regionMg34Ms44, rSpan)
+# forcesMg36Ms44, pressuresMg36Ms44 = calculateForce(modelAllForces, regionMg36Ms44, rSpan)
+# forcesMg38Ms44, pressuresMg38Ms44 = calculateForce(modelAllForces, regionMg38Ms44, rSpan)
+# forcesMg40Ms44, pressuresMg40Ms44 = calculateForce(modelAllForces, regionMg40Ms44, rSpan)
+# forcesMg42Ms44, pressuresMg42Ms44 = calculateForce(modelAllForces, regionMg42Ms44, rSpan)
+# forcesMg44Ms44, pressuresMg44Ms44 = calculateForce(modelAllForces, regionMg44Ms44, rSpan)
+# forcesMg46Ms44, pressuresMg46Ms44 = calculateForce(modelAllForces, regionMg46Ms44, rSpan)
+# forcesMg48Ms44, pressuresMg48Ms44 = calculateForce(modelAllForces, regionMg48Ms44, rSpan)
+# forcesMg50Ms44, pressuresMg50Ms44 = calculateForce(modelAllForces, regionMg50Ms44, rSpan)
+
+# regionMg30Ms46 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.6)
+# regionMg32Ms46 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.6)
+# regionMg34Ms46 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.6)
+# regionMg36Ms46 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.6)
+# regionMg38Ms46 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.6)
+# regionMg40Ms46 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.6)
+# regionMg42Ms46 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.6)
+# regionMg44Ms46 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.6)
+# regionMg46Ms46 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.6)
+# regionMg48Ms46 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.6)
+# regionMg50Ms46 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.6)
+
+# regionMg30Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg32Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg34Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg36Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg38Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg40Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg42Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg44Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg46Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg48Ms46.calculateTau(modelAllForces, rSpan)
+# regionMg50Ms46.calculateTau(modelAllForces, rSpan)
+
+# forcesMg30Ms46, pressuresMg30Ms46 = calculateForce(modelAllForces, regionMg30Ms46, rSpan)
+# forcesMg32Ms46, pressuresMg32Ms46 = calculateForce(modelAllForces, regionMg32Ms46, rSpan)
+# forcesMg34Ms46, pressuresMg34Ms46 = calculateForce(modelAllForces, regionMg34Ms46, rSpan)
+# forcesMg36Ms46, pressuresMg36Ms46 = calculateForce(modelAllForces, regionMg36Ms46, rSpan)
+# forcesMg38Ms46, pressuresMg38Ms46 = calculateForce(modelAllForces, regionMg38Ms46, rSpan)
+# forcesMg40Ms46, pressuresMg40Ms46 = calculateForce(modelAllForces, regionMg40Ms46, rSpan)
+# forcesMg42Ms46, pressuresMg42Ms46 = calculateForce(modelAllForces, regionMg42Ms46, rSpan)
+# forcesMg44Ms46, pressuresMg44Ms46 = calculateForce(modelAllForces, regionMg44Ms46, rSpan)
+# forcesMg46Ms46, pressuresMg46Ms46 = calculateForce(modelAllForces, regionMg46Ms46, rSpan)
+# forcesMg48Ms46, pressuresMg48Ms46 = calculateForce(modelAllForces, regionMg48Ms46, rSpan)
+# forcesMg50Ms46, pressuresMg50Ms46 = calculateForce(modelAllForces, regionMg50Ms46, rSpan)
+
+# regionMg30Ms48 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**4.8)
+# regionMg32Ms48 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**4.8)
+# regionMg34Ms48 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**4.8)
+# regionMg36Ms48 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**4.8)
+# regionMg38Ms48 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**4.8)
+# regionMg40Ms48 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**4.8)
+# regionMg42Ms48 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**4.8)
+# regionMg44Ms48 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**4.8)
+# regionMg46Ms48 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**4.8)
+# regionMg48Ms48 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**4.8)
+# regionMg50Ms48 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**4.8)
+
+# regionMg30Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg32Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg34Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg36Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg38Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg40Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg42Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg44Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg46Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg48Ms48.calculateTau(modelAllForces, rSpan)
+# regionMg50Ms48.calculateTau(modelAllForces, rSpan)
+
+# forcesMg30Ms48, pressuresMg30Ms48 = calculateForce(modelAllForces, regionMg30Ms48, rSpan)
+# forcesMg32Ms48, pressuresMg32Ms48 = calculateForce(modelAllForces, regionMg32Ms48, rSpan)
+# forcesMg34Ms48, pressuresMg34Ms48 = calculateForce(modelAllForces, regionMg34Ms48, rSpan)
+# forcesMg36Ms48, pressuresMg36Ms48 = calculateForce(modelAllForces, regionMg36Ms48, rSpan)
+# forcesMg38Ms48, pressuresMg38Ms48 = calculateForce(modelAllForces, regionMg38Ms48, rSpan)
+# forcesMg40Ms48, pressuresMg40Ms48 = calculateForce(modelAllForces, regionMg40Ms48, rSpan)
+# forcesMg42Ms48, pressuresMg42Ms48 = calculateForce(modelAllForces, regionMg42Ms48, rSpan)
+# forcesMg44Ms48, pressuresMg44Ms48 = calculateForce(modelAllForces, regionMg44Ms48, rSpan)
+# forcesMg46Ms48, pressuresMg46Ms48 = calculateForce(modelAllForces, regionMg46Ms48, rSpan)
+# forcesMg48Ms48, pressuresMg48Ms48 = calculateForce(modelAllForces, regionMg48Ms48, rSpan)
+# forcesMg50Ms48, pressuresMg50Ms48 = calculateForce(modelAllForces, regionMg50Ms48, rSpan)
+
+# regionMg30Ms50 = region("Mshell = 10^3 Msun", massShell=10**3, massNewStars=10**5)
+# regionMg32Ms50 = region("Mshell = 10^3.2 Msun", massShell=10**3.2, massNewStars=10**5)
+# regionMg34Ms50 = region("Mshell = 10^3.4 Msun", massShell=10**3.4, massNewStars=10**5)
+# regionMg36Ms50 = region("Mshell = 10^3.6 Msun", massShell=10**3.6, massNewStars=10**5)
+# regionMg38Ms50 = region("Mshell = 10^3.8 Msun", massShell=10**3.8, massNewStars=10**5)
+# regionMg40Ms50 = region("Mshell = 10^4 Msun", massShell=10**4, massNewStars=10**5)
+# regionMg42Ms50 = region("Mshell = 10^4.2 Msun", massShell=10**4.2, massNewStars=10**5)
+# regionMg44Ms50 = region("Mshell = 10^4.4 Msun", massShell=10**4.4, massNewStars=10**5)
+# regionMg46Ms50 = region("Mshell = 10^4.6 Msun", massShell=10**4.6, massNewStars=10**5)
+# regionMg48Ms50 = region("Mshell = 10^4.8 Msun", massShell=10**4.8, massNewStars=10**5)
+# regionMg50Ms50 = region("Mshell = 10^5 Msun", massShell=10**5, massNewStars=10**5)
+
+# regionMg30Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg32Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg34Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg36Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg38Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg40Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg42Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg44Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg46Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg48Ms50.calculateTau(modelAllForces, rSpan)
+# regionMg50Ms50.calculateTau(modelAllForces, rSpan)
+
+# forcesMg30Ms50, pressuresMg30Ms50 = calculateForce(modelAllForces, regionMg30Ms50, rSpan)
+# forcesMg32Ms50, pressuresMg32Ms50 = calculateForce(modelAllForces, regionMg32Ms50, rSpan)
+# forcesMg34Ms50, pressuresMg34Ms50 = calculateForce(modelAllForces, regionMg34Ms50, rSpan)
+# forcesMg36Ms50, pressuresMg36Ms50 = calculateForce(modelAllForces, regionMg36Ms50, rSpan)
+# forcesMg38Ms50, pressuresMg38Ms50 = calculateForce(modelAllForces, regionMg38Ms50, rSpan)
+# forcesMg40Ms50, pressuresMg40Ms50 = calculateForce(modelAllForces, regionMg40Ms50, rSpan)
+# forcesMg42Ms50, pressuresMg42Ms50 = calculateForce(modelAllForces, regionMg42Ms50, rSpan)
+# forcesMg44Ms50, pressuresMg44Ms50 = calculateForce(modelAllForces, regionMg44Ms50, rSpan)
+# forcesMg46Ms50, pressuresMg46Ms50 = calculateForce(modelAllForces, regionMg46Ms50, rSpan)
+# forcesMg48Ms50, pressuresMg48Ms50 = calculateForce(modelAllForces, regionMg48Ms50, rSpan)
+# forcesMg50Ms50, pressuresMg50Ms50 = calculateForce(modelAllForces, regionMg50Ms50, rSpan)
+
+
+# forcesMg30Ms50.massNewStars = 5.0
+# forcesMg30Ms50.massShell = 3.0
+# forcesMg32Ms50.massNewStars = 5.0
+# forcesMg32Ms50.massShell = 3.2
+# forcesMg34Ms50.massNewStars = 5.0
+# forcesMg34Ms50.massShell = 3.4
+# forcesMg36Ms50.massNewStars = 5.0
+# forcesMg36Ms50.massShell = 3.6
+# forcesMg38Ms50.massNewStars = 5.0
+# forcesMg38Ms50.massShell = 3.8
+# forcesMg40Ms50.massNewStars = 5.0
+# forcesMg40Ms50.massShell = 4.0
+# forcesMg42Ms50.massNewStars = 5.0
+# forcesMg42Ms50.massShell = 4.2
+# forcesMg44Ms50.massNewStars = 5.0
+# forcesMg44Ms50.massShell = 4.4
+# forcesMg46Ms50.massNewStars = 5.0
+# forcesMg46Ms50.massShell = 4.6
+# forcesMg48Ms50.massNewStars = 5.0
+# forcesMg48Ms50.massShell = 4.8
+# forcesMg50Ms50.massNewStars = 5.0
+# forcesMg50Ms50.massShell = 5.0
+
+# forcesMg30Ms48.massNewStars = 4.8
+# forcesMg30Ms48.massShell = 3.0
+# forcesMg32Ms48.massNewStars = 4.8
+# forcesMg32Ms48.massShell = 3.2
+# forcesMg34Ms48.massNewStars = 4.8
+# forcesMg34Ms48.massShell = 3.4
+# forcesMg36Ms48.massNewStars = 4.8
+# forcesMg36Ms48.massShell = 3.6
+# forcesMg38Ms48.massNewStars = 4.8
+# forcesMg38Ms48.massShell = 3.8
+# forcesMg40Ms48.massNewStars = 4.8
+# forcesMg40Ms48.massShell = 4.0
+# forcesMg42Ms48.massNewStars = 4.8
+# forcesMg42Ms48.massShell = 4.2
+# forcesMg44Ms48.massNewStars = 4.8
+# forcesMg44Ms48.massShell = 4.4
+# forcesMg46Ms48.massNewStars = 4.8
+# forcesMg46Ms48.massShell = 4.6
+# forcesMg48Ms48.massNewStars = 4.8
+# forcesMg48Ms48.massShell = 4.8
+# forcesMg50Ms48.massNewStars = 4.8
+# forcesMg50Ms48.massShell = 5.0
+
+# forcesMg30Ms46.massNewStars = 4.6
+# forcesMg30Ms46.massShell = 3.0
+# forcesMg32Ms46.massNewStars = 4.6
+# forcesMg32Ms46.massShell = 3.2
+# forcesMg34Ms46.massNewStars = 4.6
+# forcesMg34Ms46.massShell = 3.4
+# forcesMg36Ms46.massNewStars = 4.6
+# forcesMg36Ms46.massShell = 3.6
+# forcesMg38Ms46.massNewStars = 4.6
+# forcesMg38Ms46.massShell = 3.8
+# forcesMg40Ms46.massNewStars = 4.6
+# forcesMg40Ms46.massShell = 4.0
+# forcesMg42Ms46.massNewStars = 4.6
+# forcesMg42Ms46.massShell = 4.2
+# forcesMg44Ms46.massNewStars = 4.6
+# forcesMg44Ms46.massShell = 4.4
+# forcesMg46Ms46.massNewStars = 4.6
+# forcesMg46Ms46.massShell = 4.6
+# forcesMg48Ms46.massNewStars = 4.6
+# forcesMg48Ms46.massShell = 4.8
+# forcesMg50Ms46.massNewStars = 4.6
+# forcesMg50Ms46.massShell = 5.0
+
+# forcesMg30Ms44.massNewStars = 4.4
+# forcesMg30Ms44.massShell = 3.0
+# forcesMg32Ms44.massNewStars = 4.4
+# forcesMg32Ms44.massShell = 3.2
+# forcesMg34Ms44.massNewStars = 4.4
+# forcesMg34Ms44.massShell = 3.4
+# forcesMg36Ms44.massNewStars = 4.4
+# forcesMg36Ms44.massShell = 3.6
+# forcesMg38Ms44.massNewStars = 4.4
+# forcesMg38Ms44.massShell = 3.8
+# forcesMg40Ms44.massNewStars = 4.4
+# forcesMg40Ms44.massShell = 4.0
+# forcesMg42Ms44.massNewStars = 4.4
+# forcesMg42Ms44.massShell = 4.2
+# forcesMg44Ms44.massNewStars = 4.4
+# forcesMg44Ms44.massShell = 4.4
+# forcesMg46Ms44.massNewStars = 4.4
+# forcesMg46Ms44.massShell = 4.6
+# forcesMg48Ms44.massNewStars = 4.4
+# forcesMg48Ms44.massShell = 4.8
+# forcesMg50Ms44.massNewStars = 4.4
+# forcesMg50Ms44.massShell = 5.0
+
+# forcesMg30Ms42.massNewStars = 4.2
+# forcesMg30Ms42.massShell = 3.0
+# forcesMg32Ms42.massNewStars = 4.2
+# forcesMg32Ms42.massShell = 3.2
+# forcesMg34Ms42.massNewStars = 4.2
+# forcesMg34Ms42.massShell = 3.4
+# forcesMg36Ms42.massNewStars = 4.2
+# forcesMg36Ms42.massShell = 3.6
+# forcesMg38Ms42.massNewStars = 4.2
+# forcesMg38Ms42.massShell = 3.8
+# forcesMg40Ms42.massNewStars = 4.2
+# forcesMg40Ms42.massShell = 4.0
+# forcesMg42Ms42.massNewStars = 4.2
+# forcesMg42Ms42.massShell = 4.2
+# forcesMg44Ms42.massNewStars = 4.2
+# forcesMg44Ms42.massShell = 4.4
+# forcesMg46Ms42.massNewStars = 4.2
+# forcesMg46Ms42.massShell = 4.6
+# forcesMg48Ms42.massNewStars = 4.2
+# forcesMg48Ms42.massShell = 4.8
+# forcesMg50Ms42.massNewStars = 4.2
+# forcesMg50Ms42.massShell = 5.0
+
+# forcesMg30Ms40.massNewStars = 4.0
+# forcesMg30Ms40.massShell = 3.0
+# forcesMg32Ms40.massNewStars = 4.0
+# forcesMg32Ms40.massShell = 3.2
+# forcesMg34Ms40.massNewStars = 4.0
+# forcesMg34Ms40.massShell = 3.4
+# forcesMg36Ms40.massNewStars = 4.0
+# forcesMg36Ms40.massShell = 3.6
+# forcesMg38Ms40.massNewStars = 4.0
+# forcesMg38Ms40.massShell = 3.8
+# forcesMg40Ms40.massNewStars = 4.0
+# forcesMg40Ms40.massShell = 4.0
+# forcesMg42Ms40.massNewStars = 4.0
+# forcesMg42Ms40.massShell = 4.2
+# forcesMg44Ms40.massNewStars = 4.0
+# forcesMg44Ms40.massShell = 4.4
+# forcesMg46Ms40.massNewStars = 4.0
+# forcesMg46Ms40.massShell = 4.6
+# forcesMg48Ms40.massNewStars = 4.0
+# forcesMg48Ms40.massShell = 4.8
+# forcesMg50Ms40.massNewStars = 4.0
+# forcesMg50Ms40.massShell = 5.0
+
+clusterMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6]
+shellMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6]
+
+# forces = [forcesMg30Ms40,forcesMg32Ms40,forcesMg34Ms40,forcesMg36Ms40,forcesMg38Ms40,forcesMg40Ms40,forcesMg42Ms40,forcesMg44Ms40,forcesMg46Ms40,forcesMg48Ms40,forcesMg50Ms40,forcesMg30Ms42,forcesMg32Ms42,forcesMg34Ms42,forcesMg36Ms42,forcesMg38Ms42,forcesMg40Ms42,forcesMg42Ms42,forcesMg44Ms42,forcesMg46Ms42,forcesMg48Ms42,forcesMg50Ms42,forcesMg30Ms44,forcesMg32Ms44,forcesMg34Ms44,forcesMg36Ms44,forcesMg38Ms44,forcesMg40Ms44,forcesMg42Ms44,forcesMg44Ms44,forcesMg46Ms44,forcesMg48Ms44,forcesMg50Ms44,forcesMg30Ms46,forcesMg32Ms46,forcesMg34Ms46,forcesMg36Ms46,forcesMg38Ms46,forcesMg40Ms46,forcesMg42Ms46,forcesMg44Ms46,forcesMg46Ms46,forcesMg48Ms46,forcesMg50Ms46,forcesMg30Ms48,forcesMg32Ms48,forcesMg34Ms48,forcesMg36Ms48,forcesMg38Ms48,forcesMg40Ms48,forcesMg42Ms48,forcesMg44Ms48,forcesMg46Ms48,forcesMg48Ms48,forcesMg50Ms48,forcesMg30Ms50,forcesMg32Ms50,forcesMg34Ms50,forcesMg36Ms50,forcesMg38Ms50,forcesMg40Ms50,forcesMg42Ms50,forcesMg44Ms50,forcesMg46Ms50,forcesMg48Ms50,forcesMg50Ms50]
+# regionList = [regionMg30Ms40,regionMg32Ms40,regionMg34Ms40,regionMg36Ms40,regionMg38Ms40,regionMg40Ms40,regionMg42Ms40,regionMg44Ms40,regionMg46Ms40,regionMg48Ms40,regionMg50Ms40,regionMg30Ms42,regionMg32Ms42,regionMg34Ms42,regionMg36Ms42,regionMg38Ms42,regionMg40Ms42,regionMg42Ms42,regionMg44Ms42,regionMg46Ms42,regionMg48Ms42,regionMg50Ms42,regionMg30Ms44,regionMg32Ms44,regionMg34Ms44,regionMg36Ms44,regionMg38Ms44,regionMg40Ms44,regionMg42Ms44,regionMg44Ms44,regionMg46Ms44,regionMg48Ms44,regionMg50Ms44,regionMg30Ms46,regionMg32Ms46,regionMg34Ms46,regionMg36Ms46,regionMg38Ms46,regionMg40Ms46,regionMg42Ms46,regionMg44Ms46,regionMg46Ms46,regionMg48Ms46,regionMg50Ms46,regionMg30Ms48,regionMg32Ms48,regionMg34Ms48,regionMg36Ms48,regionMg38Ms48,regionMg40Ms48,regionMg42Ms48,regionMg44Ms48,regionMg46Ms48,regionMg48Ms48,regionMg50Ms48,regionMg30Ms50,regionMg32Ms50,regionMg34Ms50,regionMg36Ms50,regionMg38Ms50,regionMg40Ms50,regionMg42Ms50,regionMg44Ms50,regionMg46Ms50,regionMg48Ms50,regionMg50Ms50]
 
 def getTotalForce(mass, massType, radius):
     """Returns the total force for a given mass of new stars and radius as a function of the gas mass
@@ -1268,6 +1268,28 @@ def getEpsSigma(reg):
 
     return eps, sigma
 
+def scatterPlotData(mod, radii, shellMasses, clusterMasses):
+    
+    epsList = []
+    sigmaList = []
+    forceList = []
+
+    for shMass in shellMasses:
+        for clMass in clusterMasses:
+            reg = region("temp", massShell=10**shMass, massNewStars=10**clMass)
+            reg.calculateTau(mod, radii)
+
+            eps, sigma = getEpsSigma(reg)
+            force, _ = calculateForce(mod, reg, radii)
+
+            epsList = np.append(epsList, eps)
+            sigmaList = np.append(sigmaList, sigma.value)
+            forceList = np.append(forceList, force.total.value)
+
+    return epsList, sigmaList, forceList
+    
+
+
 # for radius in rSpan:
 #     plt.figure(dpi = 200, facecolor = "white")
 
@@ -1283,26 +1305,29 @@ def getEpsSigma(reg):
 
 #     plt.legend()
 
-epsList = []
-sigmaList = []
-forceList = []
+# epsList = []
+# sigmaList = []
+# forceList = []
 
-for i, reg in enumerate(regionList):
-    eps, sigma = getEpsSigma(reg)
-    epsList = np.append(epsList, eps)
-    sigmaList = np.append(sigmaList, sigma.value)
-    forceList = np.append(forceList, forces[i].total.value)
+# for i, reg in enumerate(regionList):
+#     eps, sigma = getEpsSigma(reg)
+#     epsList = np.append(epsList, eps)
+#     sigmaList = np.append(sigmaList, sigma.value)
+#     forceList = np.append(forceList, forces[i].total.value)
 
-plt.figure(dpi = 200, facecolor = "grey")
+epsList, sigmaList, forceList = scatterPlotData(modelAllForces, rSpan, shellMasses, clusterMasses)
+
+plt.figure(dpi = 200)
 ax = plt.axes()
 
-plt.scatter(sigmaList, epsList, c = forceList, cmap = "seismic")
+plt.scatter(sigmaList, epsList, c = forceList, vmin=-1, vmax=1, cmap = "coolwarm")
 
-ax.set_facecolor("grey")
+# ax.set_facecolor("grey")
 
 plt.yscale('log')
+plt.xscale('log')
 
-plt.colorbar()
+# plt.colorbar()
 
 plt.xlabel(r"$\Sigma_{\rm gas} (g/cm^2)$")
 plt.ylabel(r"$\epsilon$")
