@@ -867,31 +867,149 @@ import matplotlib.colors as colors
 
 modelAllForces = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
 
-rad = [2, 3, 5, 10, 30, 50, 100]
-clusterMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6]
-shellMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6]
+# rad = [2, 3, 5, 10, 30, 50, 100]
+# clusterMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6]
+# shellMasses = [3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6]
 
-for r in rad:
-    epsList, sigmaList, forceList = scatterPlotData(modelAllForces, r, shellMasses, clusterMasses)
+# for r in rad:
+#     epsList, sigmaList, forceList = scatterPlotData(modelAllForces, r, shellMasses, clusterMasses)
 
-    mask = forceList > 0
+#     mask = forceList > 0
 
-    plt.figure(dpi = 200, facecolor = "white")
-    ax = plt.axes()
+#     plt.figure(dpi = 200, facecolor = "white")
+#     ax = plt.axes()
 
-    plt.scatter(sigmaList[mask], 1/(1+1/epsList[mask]), color="r")
-    plt.scatter(sigmaList[~mask], 1/(1+1/epsList[~mask]), color="b")
+#     plt.scatter(sigmaList[mask], 1/(1+1/epsList[mask]), color="r")
+#     plt.scatter(sigmaList[~mask], 1/(1+1/epsList[~mask]), color="b")
 
-    ax.set_facecolor("white")
+#     ax.set_facecolor("white")
 
-    plt.yscale('log')
-    plt.xscale('log')
+#     plt.yscale('log')
+#     plt.xscale('log')
 
-    plt.title(r)
+#     plt.title(r)
 
-    plt.xlabel(r"$\Sigma_{\rm gas} (g/cm^2)$")
-    plt.ylabel(r"$1/(1+M_{\rm sh}/M_{\rm cl})$")
+#     plt.xlabel(r"$\Sigma_{\rm gas} (g/cm^2)$")
+#     plt.ylabel(r"$1/(1+M_{\rm sh}/M_{\rm cl})$")
 
+# %%
+# Find the ratio of forces
+###################################################
+
+def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNumerator = "diffusion", forceDenominator = "ionized"):
+    acceptableValues = ["ionized","diffusion","wind","radiation","gravity", "total"]
+
+    if ~(forceNumerator in acceptableValues) or ~(forceDenominator in acceptableValues):
+        ValueError("numerator or denominator not an acceptable value.")
+
+    if forceDenominator == forceNumerator:
+        ValueError("The answer is 1 by definition, do better.")
+
+    if forceNumerator == "total" or forceDenominator == "total":
+        forces = acceptableValues
+    else:
+        forces = [forceNumerator, forceDenominator]
+
+    if forceNumerator == "diffusion" or forceDenominator == "diffusion":
+        eDotCR = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
+
+        diffusion = eDotCR * radius / (con.c * model.meanFreePath)
+
+        if forceNumerator == "diffusion":
+            numerator = diffusion
+        else:
+            denominator = diffusion
+    
+    if forceNumerator == "ionized" or forceDenominator == "ionized":
+        ionRate = model.BPASSData.ionRate[0] * massNewStars / (10**6 * u.Msun)
+        T = 10**4 * u.K
+
+        ionized = 4 * math.pi * con.k_B * T * np.sqrt(3 * ionRate * radius / alphaB)
+
+        if forceNumerator == "ionized":
+            numerator = ionized
+        else:
+            denominator = ionized
+
+    if forceNumerator == "wind" or forceDenominator == "wind":
+        eDotWind = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun)
+        mDotWind = model.BPASSData.mDotWind[0] * massNewStars / (10**6 * u.Msun)
+        vWind = np.sqrt(2 * eDotWind / mDotWind)
+
+        wind = (2 * eDotWind / vWind)
+
+        if forceNumerator == "wind":
+            numerator = wind
+        else:
+            denominator = wind
+
+    if forceNumerator == "radiation" or forceDenominator == "radiation":
+        tau = (model.tauScale * massShell / np.power(radius,2)).cgs
+
+        luminosity = model.BPASSData.luminosity[0] * massNewStars / (10**6 * u.Msun)
+        radiation = (luminosity / con.c * (1 - np.exp(-tau)))
+
+        if forceNumerator == "radiation":
+            numerator = radiation
+        else:
+            denominator = radiation
+    
+    if forceNumerator == "gravity" or forceDenominator == "gravity":
+        gravity = con.G * (massShell + massNewStars) * massShell / (np.power(radius,2))
+
+        if forceNumerator == "gravity":
+            numerator = gravity
+        else:
+            denominator = gravity
+
+    ratio = numerator / denominator
+
+    return ratio.cgs
+
+
+# %%
+# Plot ratios
+###################################################
+
+dr = 0.1
+dm = 10**4
+
+rMin = 1
+rMax = 1000
+
+mMin = 10**4
+mMax = 10**8
+
+rSpan, mSpan = np.mgrid[slice(rMin,rMax + dr, dr),
+                        slice(mMin,mMax + dm, dm)]
+
+forceNumerator = "diffusion"
+forceDenominator = "gravity"
+
+ratios = forceRatio(modelAllForces, rSpan * u.pc, mSpan * u.Msun, forceNumerator, forceDenominator)
+
+class MidPointLogNorm(colors.LogNorm):
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        colors.LogNorm.__init__(self,vmin=vmin, vmax=vmax, clip=clip)
+        self.midpoint=midpoint
+    def __call__(self, value, clip=None):
+        x, y = [np.log(self.vmin), np.log(self.midpoint), np.log(self.vmax)], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(np.log(value), x, y))
+
+plt.figure(dpi = 200, facecolor = "white")
+
+divnorm = MidPointLogNorm(vmin=ratios.min(), midpoint=1, vmax=ratios.max())
+
+c = plt.pcolormesh(rSpan, mSpan, ratios, cmap = "seismic", norm = divnorm)
+plt.colorbar(c)
+
+plt.yscale('log')
+plt.xscale('log')
+
+plt.xlabel("Radius (pc)")
+plt.ylabel(r"Cluster mass ($M_\odot$)")
+
+plt.title(f"{forceNumerator} over {forceDenominator}")
 
 
 # %%
