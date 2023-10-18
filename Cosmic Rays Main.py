@@ -897,7 +897,7 @@ modelAllForces = model("All Forces", radiationPressure=True, windPressure=True, 
 ###################################################
 
 def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNumerator = "diffusion", forceDenominator = "ionized"):
-    acceptableValues = ["ionized","diffusion","wind","radiation","gravity", "total"]
+    acceptableValues = ["ionized","diffusion","wind","radiation","gravity", "streaming", "total"]
 
     if ~(forceNumerator in acceptableValues) or ~(forceDenominator in acceptableValues):
         ValueError("numerator or denominator not an acceptable value.")
@@ -910,17 +910,27 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
     else:
         forces = [forceNumerator, forceDenominator]
 
-    if forceNumerator == "diffusion" or forceDenominator == "diffusion":
+    if "diffusion" in forces:
         eDotCR = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
 
         diffusion = eDotCR * radius / (con.c * model.meanFreePath)
 
         if forceNumerator == "diffusion":
             numerator = diffusion
-        else:
+        elif forceDenominator == "diffusion":
             denominator = diffusion
+
+    if "streaming" in forces:
+        eDotCR = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
+
+        streaming = eDotCR / 10 * u.km / u.s
+
+        if forceNumerator == "streaming":
+            numerator = streaming
+        elif forceDenominator == "streaming":
+            denominator = streaming
     
-    if forceNumerator == "ionized" or forceDenominator == "ionized":
+    if "ionized" in forces:
         ionRate = model.BPASSData.ionRate[0] * massNewStars / (10**6 * u.Msun)
         T = 10**4 * u.K
 
@@ -928,10 +938,10 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
 
         if forceNumerator == "ionized":
             numerator = ionized
-        else:
+        elif forceDenominator == "ionized":
             denominator = ionized
 
-    if forceNumerator == "wind" or forceDenominator == "wind":
+    if "wind" in forces:
         eDotWind = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun)
         mDotWind = model.BPASSData.mDotWind[0] * massNewStars / (10**6 * u.Msun)
         vWind = np.sqrt(2 * eDotWind / mDotWind)
@@ -940,10 +950,10 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
 
         if forceNumerator == "wind":
             numerator = wind
-        else:
+        elif forceDenominator == "wind":
             denominator = wind
 
-    if forceNumerator == "radiation" or forceDenominator == "radiation":
+    if "radiation" in forces:
         tau = (model.tauScale * massShell / np.power(radius,2)).cgs
 
         luminosity = model.BPASSData.luminosity[0] * massNewStars / (10**6 * u.Msun)
@@ -951,16 +961,24 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
 
         if forceNumerator == "radiation":
             numerator = radiation
-        else:
+        elif forceDenominator == "radiation":
             denominator = radiation
     
-    if forceNumerator == "gravity" or forceDenominator == "gravity":
+    if "gravity" in forces:
         gravity = con.G * (massShell + massNewStars) * massShell / (np.power(radius,2))
 
         if forceNumerator == "gravity":
             numerator = gravity
-        else:
+        elif forceDenominator == "gravity":
             denominator = gravity
+
+    if "total" in forces:
+        total = diffusion + radiation + ionized + wind - gravity
+
+        if forceNumerator == "total":
+            numerator = total
+        elif forceDenominator == "total":
+            denominator = total
 
     ratio = numerator / denominator
 
@@ -983,10 +1001,13 @@ mMax = 10**8
 rSpan, mSpan = np.mgrid[slice(rMin,rMax + dr, dr),
                         slice(mMin,mMax + dm, dm)]
 
-forceNumerator = "diffusion"
-forceDenominator = "gravity"
+forceNumerator = "streaming"
+forceDenominator = "ionized"
 
-ratios = forceRatio(modelAllForces, rSpan * u.pc, mSpan * u.Msun, forceNumerator, forceDenominator)
+mShell = 10**5 * u.Msun
+mCluster = mSpan * u.Msun
+
+ratios = forceRatio(modelAllForces, rSpan * u.pc, mCluster, mShell, forceNumerator, forceDenominator)
 
 class MidPointLogNorm(colors.LogNorm):
     def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
