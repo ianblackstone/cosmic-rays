@@ -923,7 +923,7 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
     if "streaming" in forces:
         eDotCR = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
 
-        streaming = eDotCR / 10 * u.km / u.s
+        streaming = eDotCR / (10 * u.km / u.s)
 
         if forceNumerator == "streaming":
             numerator = streaming
@@ -1001,7 +1001,7 @@ mMax = 10**8
 rSpan, mSpan = np.mgrid[slice(rMin,rMax + dr, dr),
                         slice(mMin,mMax + dm, dm)]
 
-forceNumerator = "streaming"
+forceNumerator = "diffusion"
 forceDenominator = "ionized"
 
 mShell = 10**5 * u.Msun
@@ -1021,7 +1021,7 @@ plt.figure(dpi = 200, facecolor = "white")
 
 divnorm = MidPointLogNorm(vmin=ratios.min(), midpoint=1, vmax=ratios.max())
 
-c = plt.pcolormesh(rSpan, mSpan, ratios, cmap = "seismic", norm = divnorm)
+c = plt.pcolormesh(rSpan, mSpan, ratios, cmap = "seismic", shading = "auto", norm = divnorm)
 plt.colorbar(c)
 
 plt.yscale('log')
@@ -1032,6 +1032,53 @@ plt.ylabel(r"Cluster mass ($M_\odot$)")
 
 plt.title(f"{forceNumerator} over {forceDenominator}")
 
+
+# %% Plot forces over ionized pressure
+###################################################
+
+for i, age in enumerate(modelAllForces.BPASSData.age):
+    ionRate = modelAllForces.BPASSData.ionRate[i]
+    eDotWind = modelAllForces.BPASSData.eDotWind[i]
+    eDotCR = modelAllForces.windToCREnergyFraction * eDotWind
+    mDotWind = modelAllForces.BPASSData.mDotWind[i]
+    luminosity = modelAllForces.BPASSData.luminosity[i]
+    T = 10**4 * u.K
+    mStarNorm = 10**6 * u.Msun
+    tau4 = (modelAllForces.tauScale * 10**4 * u.Msun / rSpan**2).cgs
+    tau5 = (modelAllForces.tauScale * 10**5 * u.Msun / rSpan**2).cgs
+    tau6 = (modelAllForces.tauScale * 10**6 * u.Msun / rSpan**2).cgs
+    vAlfven = 10 * u.km / u.s
+
+    mStarCR = ((4 * math.pi * con.c * modelAllForces.meanFreePath * con.k_B * T / eDotCR)**2 * mStarNorm * 3 * ionRate / alphaB * 1/rSpan).to(u.Msun)
+    mStarWind = (24 * ionRate * rSpan * (math.pi * con.k_B * T)**2 * mStarNorm / (eDotWind * mDotWind * alphaB)).to(u.Msun)
+    mStarRP4 = (3 * ionRate * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau4))))**2 * mStarNorm).to(u.Msun)
+    mStarRP5 = (3 * ionRate * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau5))))**2 * mStarNorm).to(u.Msun)
+    mStarRP6 = (3 * ionRate * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau6))))**2 * mStarNorm).to(u.Msun)
+    mStarStream = ((vAlfven * 4 * math.pi * con.k_B * T / eDotCR)**2 * 3 * ionRate * rSpan / alphaB * mStarNorm).to(u.Msun)
+
+    ageLabel = age / (10**6 * u.yr) * u.Myr
+
+    plt.figure(dpi = 200)
+
+    plt.title(f"Forces over ionized gas for {ageLabel:.1f}")
+
+    plt.plot(rSpan, mStarCR, label = "Diffusion")
+    plt.plot(rSpan, mStarWind, label = "Wind")
+    plt.plot(rSpan, mStarRP4, label = r"RP, $M_{\rm sh}=10^4$")
+    plt.plot(rSpan, mStarRP5, label = r"RP, $M_{\rm sh}=10^5$")
+    plt.plot(rSpan, mStarRP6, label = r"RP, $M_{\rm sh}=10^6$")
+    plt.plot(rSpan, mStarStream, label = "Streaming")
+
+    plt.xlabel("Radius (pc)")
+    plt.ylabel(r"$M_{\rm cl} (M_\odot)$")
+
+    plt.xscale('log')
+    plt.yscale('log')
+
+    plt.xlim(rSpan[0].value, rSpan[-1].value)
+    plt.ylim(10**4, 10**9)
+
+    plt.legend()
 
 # %%
 # Plot radius and time dependent velocity
