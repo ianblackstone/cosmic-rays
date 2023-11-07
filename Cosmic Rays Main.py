@@ -896,8 +896,10 @@ modelAllForces = model("All Forces", radiationPressure=True, windPressure=True, 
 # Find the ratio of forces
 ###################################################
 
-def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNumerator = "diffusion", forceDenominator = "ionized"):
-    acceptableValues = ["ionized","diffusion","wind","radiation","gravity", "streaming", "total"]
+phi = 0.73
+
+def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, ageIndex = 0, forceNumerator = "diffusion", forceDenominator = "ionized"):
+    acceptableValues = ["ionized", "diffusion", "wind", "radiation", "gravity", "streaming", "lAlpha", "ISM", "total"]
 
     if ~(forceNumerator in acceptableValues) or ~(forceDenominator in acceptableValues):
         ValueError("numerator or denominator not an acceptable value.")
@@ -911,7 +913,7 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
         forces = [forceNumerator, forceDenominator]
 
     if "diffusion" in forces:
-        eDotCR = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
+        eDotCR = model.BPASSData.eDotWind[ageIndex] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
 
         diffusion = eDotCR * radius / (con.c * model.meanFreePath)
 
@@ -921,7 +923,7 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
             denominator = diffusion
 
     if "streaming" in forces:
-        eDotCR = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
+        eDotCR = model.BPASSData.eDotWind[ageIndex] * massNewStars / (10**6 * u.Msun) * model.windToCREnergyFraction
 
         streaming = eDotCR / (10 * u.km / u.s)
 
@@ -929,12 +931,29 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
             numerator = streaming
         elif forceDenominator == "streaming":
             denominator = streaming
+
+    if "lAlpha" in forces:
+
+        lAlpha = model.BPASSData.ionLuminosity[ageIndex] * massNewStars / (10**6 * u.Msun) * 35 * 0.68 / con.c
+
+        if forceNumerator == "lAlpha":
+            numerator = lAlpha
+        elif forceDenominator == "lAlpha":
+            denominator = lAlpha
     
+    if "ISM" in forces:
+        ISM = 10**-12 * u.erg / u.cm**3 * 4 * math.pi * radius**2
+
+        if forceNumerator == "ISM":
+            numerator = ISM
+        elif forceDenominator == "ISM":
+            denominator == ISM
+
     if "ionized" in forces:
-        ionRate = model.BPASSData.ionRate[0] * massNewStars / (10**6 * u.Msun)
+        ionRate = model.BPASSData.ionRate[ageIndex] * massNewStars / (10**6 * u.Msun)
         T = 10**4 * u.K
 
-        ionized = 4 * math.pi * con.k_B * T * np.sqrt(3 * ionRate * radius / alphaB)
+        ionized = con.k_B * T * np.sqrt(12 * math.pi * ionRate * phi * radius / alphaB)
 
         if forceNumerator == "ionized":
             numerator = ionized
@@ -942,8 +961,8 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
             denominator = ionized
 
     if "wind" in forces:
-        eDotWind = model.BPASSData.eDotWind[0] * massNewStars / (10**6 * u.Msun)
-        mDotWind = model.BPASSData.mDotWind[0] * massNewStars / (10**6 * u.Msun)
+        eDotWind = model.BPASSData.eDotWind[ageIndex] * massNewStars / (10**6 * u.Msun)
+        mDotWind = model.BPASSData.mDotWind[ageIndex] * massNewStars / (10**6 * u.Msun)
         vWind = np.sqrt(2 * eDotWind / mDotWind)
 
         wind = (2 * eDotWind / vWind)
@@ -955,9 +974,11 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, forceNum
 
     if "radiation" in forces:
         tau = (model.tauScale * massShell / np.power(radius,2)).cgs
+        kappaIR = 5 * u.cm**2 / u.g
+        tauIR = (kappaIR * massShell / (4 * math.pi * np.power(radius,2))).cgs
 
-        luminosity = model.BPASSData.luminosity[0] * massNewStars / (10**6 * u.Msun)
-        radiation = (luminosity / con.c * (1 - np.exp(-tau)))
+        luminosity = model.BPASSData.luminosity[ageIndex] * massNewStars / (10**6 * u.Msun)
+        radiation = (luminosity / con.c * (1 - np.exp(-tau) + tauIR))
 
         if forceNumerator == "radiation":
             numerator = radiation
@@ -1007,7 +1028,9 @@ forceDenominator = "ionized"
 mShell = 10**5 * u.Msun
 mCluster = mSpan * u.Msun
 
-ratios = forceRatio(modelAllForces, rSpan * u.pc, mCluster, mShell, forceNumerator, forceDenominator)
+ageIndex = 0
+
+ratios = forceRatio(modelAllForces, rSpan * u.pc, mCluster, mShell, ageIndex, forceNumerator, forceDenominator)
 
 class MidPointLogNorm(colors.LogNorm):
     def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
@@ -1036,29 +1059,49 @@ plt.title(f"{forceNumerator} over {forceDenominator}")
 # %% Plot forces over ionized pressure
 ###################################################
 
-for i, age in enumerate(modelAllForces.BPASSData.age):
+rSpan = np.logspace(0, 3, 1000) * u.pc
+cutoffAge = 10**7 * u.yr
+ages = modelAllForces.BPASSData.age[modelAllForces.BPASSData.age < cutoffAge]
+
+for i, age in enumerate(ages):
     ionRate = modelAllForces.BPASSData.ionRate[i]
+    ionLuminosity = modelAllForces.BPASSData.ionLuminosity[i]
     eDotWind = modelAllForces.BPASSData.eDotWind[i]
     eDotCR = modelAllForces.windToCREnergyFraction * eDotWind
     mDotWind = modelAllForces.BPASSData.mDotWind[i]
     luminosity = modelAllForces.BPASSData.luminosity[i]
     T = 10**4 * u.K
     mStarNorm = 10**6 * u.Msun
+    kappaIR = 5 * u.cm**2 / u.g
     tau4 = (modelAllForces.tauScale * 10**4 * u.Msun / rSpan**2).cgs
     tau5 = (modelAllForces.tauScale * 10**5 * u.Msun / rSpan**2).cgs
     tau6 = (modelAllForces.tauScale * 10**6 * u.Msun / rSpan**2).cgs
+    tauIR4 = (kappaIR * 10**4 * u.Msun / (4 * math.pi * rSpan**2)).cgs
+    tauIR5 = (kappaIR * 10**5 * u.Msun / (4 * math.pi * rSpan**2)).cgs
+    tauIR6 = (kappaIR * 10**6 * u.Msun / (4 * math.pi * rSpan**2)).cgs
     vAlfven = 10 * u.km / u.s
+    phi = 0.73
+    ISMPressure = 10**-12 * u.erg / u.cm**3
 
-    mStarCR = ((4 * math.pi * con.c * modelAllForces.meanFreePath * con.k_B * T / eDotCR)**2 * mStarNorm * 3 * ionRate / alphaB * 1/rSpan).to(u.Msun)
-    mStarWind = (24 * ionRate * rSpan * (math.pi * con.k_B * T)**2 * mStarNorm / (eDotWind * mDotWind * alphaB)).to(u.Msun)
-    mStarRP4 = (3 * ionRate * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau4))))**2 * mStarNorm).to(u.Msun)
-    mStarRP5 = (3 * ionRate * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau5))))**2 * mStarNorm).to(u.Msun)
-    mStarRP6 = (3 * ionRate * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau6))))**2 * mStarNorm).to(u.Msun)
-    mStarStream = ((vAlfven * 4 * math.pi * con.k_B * T / eDotCR)**2 * 3 * ionRate * rSpan / alphaB * mStarNorm).to(u.Msun)
+    tauLyEff = 158 ##* (NHI/10^21 / u.cm**2)**(1/3) (10**4 * u.K / T)**(1/3)
+    tauLyEffMax = 35 ##* (fdg/fdg_solar)**(1/4) * (10**4 * u.K / T)**(1/4)
+
+    mStarCR = ((4 * math.pi * con.c * modelAllForces.meanFreePath * con.k_B * T / eDotCR)**2 * mStarNorm * 3 * ionRate * phi / alphaB * 1/rSpan).to(u.Msun)
+    mStarWind = (24 * ionRate * phi * rSpan * (math.pi * con.k_B * T)**2 * mStarNorm / (eDotWind * mDotWind * alphaB)).to(u.Msun)
+    mStarRP4 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau4) + tauIR4)))**2 * mStarNorm).to(u.Msun)
+    mStarRP5 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau5) + tauIR5)))**2 * mStarNorm).to(u.Msun)
+    mStarRP6 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau6) + tauIR6)))**2 * mStarNorm).to(u.Msun)
+    mStarStream = ((vAlfven * 4 * math.pi * con.k_B * T / eDotCR)**2 * 3 * ionRate * phi * rSpan / alphaB * mStarNorm).to(u.Msun)
+    mStarISM = ((ISMPressure/con.k_B / T)**2 * 4 * math.pi * alphaB / 3 / ionRate / phi * rSpan**3 * mStarNorm).to(u.Msun)
+    mStarLy = ((4 * math.pi * con.k_B * T * con.c / (min(tauLyEff,tauLyEffMax) * 0.68 * ionLuminosity))**2 * 3 * ionRate * rSpan / alphaB * mStarNorm).to(u.Msun)
+    mStarSelfGravity = ((3 * ionRate * phi / alphaB / con.G**2 * (con.k_B * T)**2 * rSpan**5 / mStarNorm)**(1/3)).to(u.Msun)
+    mStarGravity4 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**4 * u.Msun)**2 * mStarNorm)).to(u.Msun)
+    mStarGravity5 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**5 * u.Msun)**2 * mStarNorm)).to(u.Msun)
+    mStarGravity6 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**6 * u.Msun)**2 * mStarNorm)).to(u.Msun)
 
     ageLabel = age / (10**6 * u.yr) * u.Myr
 
-    plt.figure(dpi = 200)
+    plt.figure(dpi = 200, facecolor = "white")
 
     plt.title(f"Forces over ionized gas for {ageLabel:.1f}")
 
@@ -1068,6 +1111,12 @@ for i, age in enumerate(modelAllForces.BPASSData.age):
     plt.plot(rSpan, mStarRP5, label = r"RP, $M_{\rm sh}=10^5$")
     plt.plot(rSpan, mStarRP6, label = r"RP, $M_{\rm sh}=10^6$")
     plt.plot(rSpan, mStarStream, label = "Streaming")
+    plt.plot(rSpan, mStarISM, label = "ISM")
+    plt.plot(rSpan, mStarLy, label = r"$Ly_\alpha$")
+    plt.plot(rSpan, mStarSelfGravity, label = "Self Gravity")
+    plt.plot(rSpan, mStarGravity4, 'k', label = r"Gravity, $M_{\rm sh}=10^4$")
+    plt.plot(rSpan, mStarGravity5, 'k', linestyle = "--", label = r"Gravity, $M_{\rm sh}=10^5$")
+    plt.plot(rSpan, mStarGravity6,  'k', linestyle = ":", label = r"Gravity, $M_{\rm sh}=10^6$")
 
     plt.xlabel("Radius (pc)")
     plt.ylabel(r"$M_{\rm cl} (M_\odot)$")
@@ -1076,9 +1125,9 @@ for i, age in enumerate(modelAllForces.BPASSData.age):
     plt.yscale('log')
 
     plt.xlim(rSpan[0].value, rSpan[-1].value)
-    plt.ylim(10**4, 10**9)
+    plt.ylim(10**2, 10**9)
 
-    plt.legend()
+    plt.legend(bbox_to_anchor=(1, 1))
 
 # %%
 # Plot radius and time dependent velocity
