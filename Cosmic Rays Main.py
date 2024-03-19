@@ -50,7 +50,7 @@ ionPressureFiducial = False
 gravityFiducial = True
 
 # alphaB recombination constant, since this is not included in astropy.
-alphaB = 2 * 10**-13 * u.cm**3 / u.s
+alphaB = 2.56 * 10**-13 * u.cm**3 / u.s
 
 # BPASS file locations
 ionFileFiducial = 'bpass/ionizing-bin-imf135_300.a+02.z020.dat'
@@ -790,38 +790,83 @@ def scatterPlotData(mod, radii, shellMasses, clusterMasses):
 # %%
 # Function to return the dominant CR force.
 
-def returnCRForce(rSpan, lambdaModel, lambdaRegion):
-    """Returns the CR force, taking the maximum of the diffusion and streaming force.
+# def returnCRForce(rSpan, lambdaModel, lambdaRegion):
+#     """Returns the CR force, taking the maximum of the diffusion and streaming force.
 
-    Args:
-        rSpan (array): Array of radii. Input in pc.
-        lambdaModel (model): The model to use.
-        lambdaRegion (region): The region to use.
+#     Args:
+#         rSpan (array): Array of radii. Input in pc.
+#         lambdaModel (model): The model to use.
+#         lambdaRegion (region): The region to use.
 
-    Returns:
-        CRForce: The maximum CR force, in dyns.
-        diffusion: The diffusion force given by 3Edot_CR / c / lambda.
-        streaming: The streaming force given by Edot_CR/v_Alvfen.
-        criticalRadius: The critical radius where streaming takes over from diffusion
-    """
+#     Returns:
+#         CRForce: The maximum CR force, in dyns.
+#         diffusion: The diffusion force given by 3Edot_CR / c / lambda.
+#         streaming: The streaming force given by Edot_CR/v_Alvfen.
+#         criticalRadius: The critical radius where streaming takes over from diffusion
+#     """
 
-    eDotCR = lambdaRegion.energyDotWind * lambdaModel.windToCREnergyFraction
+#     eDotCR = lambdaRegion.energyDotWind * lambdaModel.windToCREnergyFraction
 
-    diffusion = (3 * eDotCR * rSpan / (con.c * lambdaModel.meanFreePath)).cgs
-    streaming = (eDotCR / lambdaModel.vAlfven).cgs
+#     diffusion = (3 * eDotCR * rSpan / (con.c * lambdaModel.meanFreePath)).cgs
+#     streaming = (eDotCR / lambdaModel.vAlfven).cgs
 
-    diffusionDominatedMask = diffusion > streaming
+#     diffusionDominatedMask = diffusion > streaming
 
-    CRForce = np.copy(diffusion)
-    CRForce[diffusionDominatedMask] = streaming
+#     CRForce = np.copy(diffusion)
+#     CRForce[diffusionDominatedMask] = streaming
 
-    rCritIndex = np.searchsorted(diffusion, streaming, side="right")
-    criticalRadius = rSpan[rCritIndex]
+#     rCritIndex = np.searchsorted(diffusion, streaming, side="right")
+#     criticalRadius = rSpan[rCritIndex]
 
-    return CRForce, criticalRadius, diffusion, streaming
+#     return CRForce, criticalRadius, diffusion, streaming
+
+def returnCRForce(radii, eDotWind, meanFreePath):
+
+    eDotCR = eDotWind * 0.1
+
+    diffusion = (3 * eDotCR * radii / (con.c * meanFreePath)).cgs
+
+    return diffusion
+    
+
+def returnIonForce(radii, S):
+    T = 10**4 * u.K
+
+    if  not hasattr(S, "unit") or not hasattr(radii, "unit"):
+        raise Exception("Drop your units?")
+    if S.unit != u.s**-1:
+        raise Exception("Ion rate has wrong units")
+    if radii.unit != u.pc:
+        raise Exception("Radius has wrong units")
+
+    fIon = (np.sqrt(12 * math.pi * S * phi / alphaB * radii) * con.k_B * T).cgs
+
+    return fIon
+
+def returnWindForce(eDotWind, mDotWind):
+
+    vWind = np.sqrt(2 * eDotWind / mDotWind)
+    fWind = (2 * eDotWind / vWind).cgs
+
+    return fWind
+
+def returnRPForce(radii, lBol):
+
+    # if len(radii) > 1:
+    #     tauThin = 0.1 * radii[0]**2/radii**2
+    #     tauThick = 10 * radii[0]**2/radii**2
+    # else:
+    tauThin = 0.1
+    tauThick = 10
+
+    fRPThin = ((1 - np.exp(-tauThin)) * lBol / con.c).cgs
+    fRPThick = ((1 - np.exp(-tauThick)) * lBol / con.c).cgs
+
+    return fRPThin, fRPThick
 
 
 
+# %%
 # Define  basic models
 ###############################################################################
 # Models are created using the model class, a model only requires a name, all other parameters are set using the fiducial values
@@ -1041,136 +1086,136 @@ def forceRatio(model, radius, massNewStars, massShell = 10**4 * u.Msun, ageIndex
     return ratio.cgs
 
 
-# %%
-# Plot ratios
-###################################################
+# # %%
+# # Plot ratios
+# ###################################################
 
-dr = 0.1
-dm = 10**4
+# dr = 0.1
+# dm = 10**4
 
-rMin = 1
-rMax = 1000
+# rMin = 1
+# rMax = 1000
 
-mMin = 10**4
-mMax = 10**8
+# mMin = 10**4
+# mMax = 10**8
 
-rSpan, mSpan = np.mgrid[slice(rMin,rMax + dr, dr),
-                        slice(mMin,mMax + dm, dm)]
+# rSpan, mSpan = np.mgrid[slice(rMin,rMax + dr, dr),
+#                         slice(mMin,mMax + dm, dm)]
 
-forceNumerator = "diffusion"
-forceDenominator = "ionized"
+# forceNumerator = "diffusion"
+# forceDenominator = "ionized"
 
-mShell = 10**5 * u.Msun
-mCluster = mSpan * u.Msun
+# mShell = 10**5 * u.Msun
+# mCluster = mSpan * u.Msun
 
-ageIndex = 0
+# ageIndex = 0
 
-ratios = forceRatio(modelAllForces, rSpan * u.pc, mCluster, mShell, ageIndex, forceNumerator, forceDenominator)
+# ratios = forceRatio(modelAllForces, rSpan * u.pc, mCluster, mShell, ageIndex, forceNumerator, forceDenominator)
 
-class MidPointLogNorm(colors.LogNorm):
-    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
-        colors.LogNorm.__init__(self,vmin=vmin, vmax=vmax, clip=clip)
-        self.midpoint=midpoint
-    def __call__(self, value, clip=None):
-        x, y = [np.log(self.vmin), np.log(self.midpoint), np.log(self.vmax)], [0, 0.5, 1]
-        return np.ma.masked_array(np.interp(np.log(value), x, y))
+# class MidPointLogNorm(colors.LogNorm):
+#     def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+#         colors.LogNorm.__init__(self,vmin=vmin, vmax=vmax, clip=clip)
+#         self.midpoint=midpoint
+#     def __call__(self, value, clip=None):
+#         x, y = [np.log(self.vmin), np.log(self.midpoint), np.log(self.vmax)], [0, 0.5, 1]
+#         return np.ma.masked_array(np.interp(np.log(value), x, y))
 
-plt.figure(dpi = 200, facecolor = "white")
+# plt.figure(dpi = 200, facecolor = "white")
 
-divnorm = MidPointLogNorm(vmin=ratios.min(), midpoint=1, vmax=ratios.max())
+# divnorm = MidPointLogNorm(vmin=ratios.min(), midpoint=1, vmax=ratios.max())
 
-c = plt.pcolormesh(rSpan, mSpan, ratios, cmap = "seismic", shading = "auto", norm = divnorm)
-plt.colorbar(c)
+# c = plt.pcolormesh(rSpan, mSpan, ratios, cmap = "seismic", shading = "auto", norm = divnorm)
+# plt.colorbar(c)
 
-plt.yscale('log')
-plt.xscale('log')
+# plt.yscale('log')
+# plt.xscale('log')
 
-plt.xlabel("Radius (pc)")
-plt.ylabel(r"Cluster mass ($M_\odot$)")
+# plt.xlabel("Radius (pc)")
+# plt.ylabel(r"Cluster mass ($M_\odot$)")
 
-plt.title(f"{forceNumerator} over {forceDenominator}")
+# plt.title(f"{forceNumerator} over {forceDenominator}")
 
 
-# %% Plot forces over ionized pressure
-###################################################
+# # %% Plot forces over ionized pressure
+# ###################################################
 
-rSpan = np.logspace(0, 3, 1000) * u.pc
-cutoffAge = 10**7 * u.yr
-ages = modelAllForces.BPASSData.age[modelAllForces.BPASSData.age < cutoffAge]
+# rSpan = np.logspace(0, 3, 1000) * u.pc
+# cutoffAge = 10**7 * u.yr
+# ages = modelAllForces.BPASSData.age[modelAllForces.BPASSData.age < cutoffAge]
 
-for i, age in enumerate(ages):
-    ionRate = modelAllForces.BPASSData.ionRate[i]
-    ionLuminosity = modelAllForces.BPASSData.ionLuminosity[i]
-    eDotWind = modelAllForces.BPASSData.eDotWind[i]
-    eDotCR = modelAllForces.windToCREnergyFraction * eDotWind
-    mDotWind = modelAllForces.BPASSData.mDotWind[i]
-    luminosity = modelAllForces.BPASSData.luminosity[i]
-    T = 10**4 * u.K
-    mStarNorm = 10**6 * u.Msun
-    kappaIR = 5 * u.cm**2 / u.g
-    tau4 = (modelAllForces.tauScale * 10**4 * u.Msun / rSpan**2).cgs
-    tau5 = (modelAllForces.tauScale * 10**5 * u.Msun / rSpan**2).cgs
-    tau6 = (modelAllForces.tauScale * 10**6 * u.Msun / rSpan**2).cgs
-    tauIR4 = (kappaIR * 10**4 * u.Msun / (4 * math.pi * rSpan**2)).cgs
-    tauIR5 = (kappaIR * 10**5 * u.Msun / (4 * math.pi * rSpan**2)).cgs
-    tauIR6 = (kappaIR * 10**6 * u.Msun / (4 * math.pi * rSpan**2)).cgs
-    vAlfven = 10 * u.km / u.s
-    phi = 0.73
-    ISMPressure = 10**-12 * u.erg / u.cm**3
+# for i, age in enumerate(ages):
+#     ionRate = modelAllForces.BPASSData.ionRate[i]
+#     ionLuminosity = modelAllForces.BPASSData.ionLuminosity[i]
+#     eDotWind = modelAllForces.BPASSData.eDotWind[i]
+#     eDotCR = modelAllForces.windToCREnergyFraction * eDotWind
+#     mDotWind = modelAllForces.BPASSData.mDotWind[i]
+#     luminosity = modelAllForces.BPASSData.luminosity[i]
+#     T = 10**4 * u.K
+#     mStarNorm = 10**6 * u.Msun
+#     kappaIR = 5 * u.cm**2 / u.g
+#     tau4 = (modelAllForces.tauScale * 10**4 * u.Msun / rSpan**2).cgs
+#     tau5 = (modelAllForces.tauScale * 10**5 * u.Msun / rSpan**2).cgs
+#     tau6 = (modelAllForces.tauScale * 10**6 * u.Msun / rSpan**2).cgs
+#     tauIR4 = (kappaIR * 10**4 * u.Msun / (4 * math.pi * rSpan**2)).cgs
+#     tauIR5 = (kappaIR * 10**5 * u.Msun / (4 * math.pi * rSpan**2)).cgs
+#     tauIR6 = (kappaIR * 10**6 * u.Msun / (4 * math.pi * rSpan**2)).cgs
+#     vAlfven = 10 * u.km / u.s
+#     phi = 0.73
+#     ISMPressure = 10**-12 * u.erg / u.cm**3
 
-    tauLyEff = 158 ##* (NHI/10^21 / u.cm**2)**(1/3) (10**4 * u.K / T)**(1/3)
-    tauLyEffMax = 35 ##* (fdg/fdg_solar)**(1/4) * (10**4 * u.K / T)**(1/4)
+#     tauLyEff = 158 ##* (NHI/10^21 / u.cm**2)**(1/3) (10**4 * u.K / T)**(1/3)
+#     tauLyEffMax = 35 ##* (fdg/fdg_solar)**(1/4) * (10**4 * u.K / T)**(1/4)
 
-    mStarCR = ((4 * math.pi * con.c * modelAllForces.meanFreePath * con.k_B * T / eDotCR)**2 * mStarNorm * 3 * ionRate * phi / alphaB * 1/rSpan).to(u.Msun)
-    mStarWind = (24 * ionRate * phi * rSpan * (math.pi * con.k_B * T)**2 * mStarNorm / (eDotWind * mDotWind * alphaB)).to(u.Msun)
-    mStarRP4 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau4) + tauIR4)))**2 * mStarNorm).to(u.Msun)
-    mStarRP5 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau5) + tauIR5)))**2 * mStarNorm).to(u.Msun)
-    mStarRP6 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau6) + tauIR6)))**2 * mStarNorm).to(u.Msun)
-    mStarStream = ((vAlfven * 4 * math.pi * con.k_B * T / eDotCR)**2 * 3 * ionRate * phi * rSpan / alphaB * mStarNorm).to(u.Msun)
-    mStarISM = ((ISMPressure/con.k_B / T)**2 * 4 * math.pi * alphaB / 3 / ionRate / phi * rSpan**3 * mStarNorm).to(u.Msun)
-    mStarLy = ((4 * math.pi * con.k_B * T * con.c / (min(tauLyEff,tauLyEffMax) * 0.68 * ionLuminosity))**2 * 3 * ionRate * rSpan / alphaB * mStarNorm).to(u.Msun)
-    mStarSelfGravity = ((3 * ionRate * phi / alphaB / con.G**2 * (con.k_B * T)**2 * rSpan**5 / mStarNorm)**(1/3)).to(u.Msun)
-    mStarGravity4 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**4 * u.Msun)**2 * mStarNorm)).to(u.Msun)
-    mStarGravity5 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**5 * u.Msun)**2 * mStarNorm)).to(u.Msun)
-    mStarGravity6 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**6 * u.Msun)**2 * mStarNorm)).to(u.Msun)
+#     mStarCR = ((4 * math.pi * con.c * modelAllForces.meanFreePath * con.k_B * T / eDotCR)**2 * mStarNorm * 3 * ionRate * phi / alphaB * 1/rSpan).to(u.Msun)
+#     mStarWind = (24 * ionRate * phi * rSpan * (math.pi * con.k_B * T)**2 * mStarNorm / (eDotWind * mDotWind * alphaB)).to(u.Msun)
+#     mStarRP4 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau4) + tauIR4)))**2 * mStarNorm).to(u.Msun)
+#     mStarRP5 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau5) + tauIR5)))**2 * mStarNorm).to(u.Msun)
+#     mStarRP6 = (3 * ionRate * phi * rSpan / alphaB * (4 * math.pi * con.c * con.k_B * T / (luminosity * (1 - np.exp(-tau6) + tauIR6)))**2 * mStarNorm).to(u.Msun)
+#     mStarStream = ((vAlfven * 4 * math.pi * con.k_B * T / eDotCR)**2 * 3 * ionRate * phi * rSpan / alphaB * mStarNorm).to(u.Msun)
+#     mStarISM = ((ISMPressure/con.k_B / T)**2 * 4 * math.pi * alphaB / 3 / ionRate / phi * rSpan**3 * mStarNorm).to(u.Msun)
+#     mStarLy = ((4 * math.pi * con.k_B * T * con.c / (min(tauLyEff,tauLyEffMax) * 0.68 * ionLuminosity))**2 * 3 * ionRate * rSpan / alphaB * mStarNorm).to(u.Msun)
+#     mStarSelfGravity = ((3 * ionRate * phi / alphaB / con.G**2 * (con.k_B * T)**2 * rSpan**5 / mStarNorm)**(1/3)).to(u.Msun)
+#     mStarGravity4 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**4 * u.Msun)**2 * mStarNorm)).to(u.Msun)
+#     mStarGravity5 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**5 * u.Msun)**2 * mStarNorm)).to(u.Msun)
+#     mStarGravity6 = (3 * ionRate * phi * (con.k_B * T)**2 * rSpan**5 /(alphaB * con.G**2 * (10**6 * u.Msun)**2 * mStarNorm)).to(u.Msun)
 
-    mStarSelfGravityShell4 = ((con.G * (10**4 * u.Msun)**2 / (con.k_B * T))**2 * alphaB / (12 * math.pi * ionRate * phi) / rSpan**5 * mStarNorm).to(u.Msun)
-    mStarSelfGravityShell5 = ((con.G * (10**5 * u.Msun)**2 / (con.k_B * T))**2 * alphaB / (12 * math.pi * ionRate * phi) / rSpan**5 * mStarNorm).to(u.Msun)
-    mStarSelfGravityShell6 = ((con.G * (10**6 * u.Msun)**2 / (con.k_B * T))**2 * alphaB / (12 * math.pi * ionRate * phi) / rSpan**5 * mStarNorm).to(u.Msun)
+#     mStarSelfGravityShell4 = ((con.G * (10**4 * u.Msun)**2 / (con.k_B * T))**2 * alphaB / (12 * math.pi * ionRate * phi) / rSpan**5 * mStarNorm).to(u.Msun)
+#     mStarSelfGravityShell5 = ((con.G * (10**5 * u.Msun)**2 / (con.k_B * T))**2 * alphaB / (12 * math.pi * ionRate * phi) / rSpan**5 * mStarNorm).to(u.Msun)
+#     mStarSelfGravityShell6 = ((con.G * (10**6 * u.Msun)**2 / (con.k_B * T))**2 * alphaB / (12 * math.pi * ionRate * phi) / rSpan**5 * mStarNorm).to(u.Msun)
 
-    ageLabel = age / (10**6 * u.yr) * u.Myr
+#     ageLabel = age / (10**6 * u.yr) * u.Myr
 
-    plt.figure(dpi = 200, facecolor = "white")
+#     plt.figure(dpi = 200, facecolor = "white")
 
-    plt.title(f"Forces over ionized gas for {ageLabel:.1f}")
+#     plt.title(f"Forces over ionized gas for {ageLabel:.1f}")
 
-    plt.plot(rSpan, mStarCR, label = "Diffusion")
-    plt.plot(rSpan, mStarWind, label = "Wind")
-    plt.plot(rSpan, mStarRP4, label = r"RP, $M_{\rm sh}=10^4$")
-    plt.plot(rSpan, mStarRP5, label = r"RP, $M_{\rm sh}=10^5$")
-    plt.plot(rSpan, mStarRP6, label = r"RP, $M_{\rm sh}=10^6$")
-    plt.plot(rSpan, mStarStream, label = "Streaming")
-    plt.plot(rSpan, mStarISM, label = "ISM")
-    plt.plot(rSpan, mStarLy, label = r"$Ly_\alpha$")
-    plt.plot(rSpan, mStarSelfGravity, label = "Self Gravity")
-    plt.plot(rSpan, mStarGravity4, 'k', label = r"Gravity, $M_{\rm sh}=10^4$")
-    plt.plot(rSpan, mStarGravity5, 'k', linestyle = "--", label = r"Gravity, $M_{\rm sh}=10^5$")
-    plt.plot(rSpan, mStarGravity6, 'k', linestyle = ":", label = r"Gravity, $M_{\rm sh}=10^6$")
+#     plt.plot(rSpan, mStarCR, label = "Diffusion")
+#     plt.plot(rSpan, mStarWind, label = "Wind")
+#     plt.plot(rSpan, mStarRP4, label = r"RP, $M_{\rm sh}=10^4$")
+#     plt.plot(rSpan, mStarRP5, label = r"RP, $M_{\rm sh}=10^5$")
+#     plt.plot(rSpan, mStarRP6, label = r"RP, $M_{\rm sh}=10^6$")
+#     plt.plot(rSpan, mStarStream, label = "Streaming")
+#     plt.plot(rSpan, mStarISM, label = "ISM")
+#     plt.plot(rSpan, mStarLy, label = r"$Ly_\alpha$")
+#     plt.plot(rSpan, mStarSelfGravity, label = "Self Gravity")
+#     plt.plot(rSpan, mStarGravity4, 'k', label = r"Gravity, $M_{\rm sh}=10^4$")
+#     plt.plot(rSpan, mStarGravity5, 'k', linestyle = "--", label = r"Gravity, $M_{\rm sh}=10^5$")
+#     plt.plot(rSpan, mStarGravity6, 'k', linestyle = ":", label = r"Gravity, $M_{\rm sh}=10^6$")
 
-    plt.plot(rSpan, mStarSelfGravityShell4, 'grey', label = r"Self Gravity, shell, $M_{\rm sh}=10^4$")
-    plt.plot(rSpan, mStarSelfGravityShell5, 'grey', linestyle="--", label = r"Self Gravity, shell, $M_{\rm sh}=10^5$")
-    plt.plot(rSpan, mStarSelfGravityShell6, 'grey', linestyle=":", label = r"Self Gravity, shell, $M_{\rm sh}=10^6$")
+#     plt.plot(rSpan, mStarSelfGravityShell4, 'grey', label = r"Self Gravity, shell, $M_{\rm sh}=10^4$")
+#     plt.plot(rSpan, mStarSelfGravityShell5, 'grey', linestyle="--", label = r"Self Gravity, shell, $M_{\rm sh}=10^5$")
+#     plt.plot(rSpan, mStarSelfGravityShell6, 'grey', linestyle=":", label = r"Self Gravity, shell, $M_{\rm sh}=10^6$")
 
-    plt.xlabel("Radius (pc)")
-    plt.ylabel(r"$M_{\rm cl} (M_\odot)$")
+#     plt.xlabel("Radius (pc)")
+#     plt.ylabel(r"$M_{\rm cl} (M_\odot)$")
 
-    plt.xscale('log')
-    plt.yscale('log')
+#     plt.xscale('log')
+#     plt.yscale('log')
 
-    plt.xlim(rSpan[0].value, rSpan[-1].value)
-    plt.ylim(10**2, 10**9)
+#     plt.xlim(rSpan[0].value, rSpan[-1].value)
+#     plt.ylim(10**2, 10**9)
 
-    plt.legend(bbox_to_anchor=(1, 1))
+#     plt.legend(bbox_to_anchor=(1, 1))
 
 # %%
 # Plot radius and time dependent velocity
@@ -1605,314 +1650,314 @@ for i, age in enumerate(ages):
 # ax1.legend(loc = 8)
 # ax2.legend()
 
-# %%
-## Figure 1 - timescale comparison
-modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
-modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
+# # %%
+# ## Figure 1 - timescale comparison
+# modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+# modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
 
-regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
+# regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
 
-rSpan = np.logspace(1,3,50000) * u.pc
+# rSpan = np.logspace(1,3,50000) * u.pc
 
-mDotWind = (2 * regionOne.energyDotWind / modelOne.vWind**2).cgs
+# mDotWind = (2 * regionOne.energyDotWind / modelOne.vWind**2).cgs
 
-innerShockGasDensity = (mDotWind / (4 * math.pi * rSpan**2 * modelOne.vWind)).cgs
-innerShockNumberDensity = 4 * innerShockGasDensity / con.m_p.cgs
+# innerShockGasDensity = (mDotWind / (4 * math.pi * rSpan**2 * modelOne.vWind)).cgs
+# innerShockNumberDensity = 4 * innerShockGasDensity / con.m_p.cgs
 
-vEsc = np.sqrt(2 * con.G * (regionOne.massShell + regionOne.massNewStars)/ rSpan).cgs
+# vEsc = np.sqrt(2 * con.G * (regionOne.massShell + regionOne.massNewStars)/ rSpan).cgs
 
-tPion = modelOne.pionLifetime / innerShockNumberDensity / u.cm**3
-tDiff001 = (3*rSpan**2 / (con.c * modelOne.meanFreePath)).cgs
-tDiff03 = (3*rSpan**2 / (con.c * modelTwo.meanFreePath)).cgs
-tAdv = (rSpan/vEsc).cgs
-tStream = (rSpan/modelOne.vAlfven).cgs
+# tPion = modelOne.pionLifetime / innerShockNumberDensity / u.cm**3
+# tDiff001 = (3*rSpan**2 / (con.c * modelOne.meanFreePath)).cgs
+# tDiff03 = (3*rSpan**2 / (con.c * modelTwo.meanFreePath)).cgs
+# tAdv = (rSpan/vEsc).cgs
+# tStream = (rSpan/modelOne.vAlfven).cgs
 
-plt.figure(dpi = 200, facecolor="white")
+# plt.figure(dpi = 200, facecolor="white")
 
-plt.plot(rSpan, tDiff001.to(u.Myr), label=r"Diff $\lambda = 0.01$ pc")
-plt.plot(rSpan, tDiff03.to(u.Myr), label=r"Diff $\lambda = 0.3$ pc")
-plt.plot(rSpan, tAdv.to(u.Myr), label=r"Advection ($v = v_{\rm esc}$)")
-plt.plot(rSpan, tPion.to(u.Myr), label="Pion losses")
-plt.plot(rSpan, tStream.to(u.Myr), label="Streaming")
+# plt.plot(rSpan, tDiff001.to(u.Myr), label=r"Diff $\lambda = 0.01$ pc")
+# plt.plot(rSpan, tDiff03.to(u.Myr), label=r"Diff $\lambda = 0.3$ pc")
+# plt.plot(rSpan, tAdv.to(u.Myr), label=r"Advection ($v = v_{\rm esc}$)")
+# plt.plot(rSpan, tPion.to(u.Myr), label="Pion losses")
+# plt.plot(rSpan, tStream.to(u.Myr), label="Streaming")
 
-plt.xscale('log')
-plt.yscale('log')
+# plt.xscale('log')
+# plt.yscale('log')
 
-plt.xlabel("Radius (pc)")
-plt.ylabel("Time (Myr)")
+# plt.xlabel("Radius (pc)")
+# plt.ylabel("Time (Myr)")
 
-plt.legend()
+# plt.legend()
     
-# %%
-# Figure 3 - CR to RP force ratio
+# # %%
+# # Figure 3 - CR to RP force ratio
 
-modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
-modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
+# modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+# modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
 
-regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
+# regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
   
-rSpan = np.logspace(1,3,50000) * u.pc
+# rSpan = np.logspace(1,3,50000) * u.pc
 
-clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
+# clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
 
-eDotWind = modelOne.BPASSData.eDotWind[i] * clusterRatio
-eDotCR = modelOne.windToCREnergyFraction * eDotWind
+# eDotWind = modelOne.BPASSData.eDotWind[0] * clusterRatio
+# eDotCR = modelOne.windToCREnergyFraction * eDotWind
 
-tauThinConst = 0.1
-tauThickConst = 10
-tauThin = 0.1 * rSpan[0]**2/rSpan**2
-tauThick = 10 * rSpan[0]**2/rSpan**2
+# tauThinConst = 0.1
+# tauThickConst = 10
+# tauThin = 0.1 * rSpan[0]**2/rSpan**2
+# tauThick = 10 * rSpan[0]**2/rSpan**2
 
-lBol = regionOne.luminosity
+# lBol = regionOne.luminosity
 
-fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
-fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
+# fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
+# fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
 
-fRPThinConstant = ((1 - np.exp(-tauThinConst)) * lBol / con.c).cgs
-fRPThickConstant = ((1 - np.exp(-tauThickConst)) * lBol / con.c).cgs
-fRPThin = ((1 - np.exp(-tauThin)) * lBol / con.c).cgs
-fRPThick = ((1 - np.exp(-tauThick)) * lBol / con.c).cgs
+# fRPThinConstant = ((1 - np.exp(-tauThinConst)) * lBol / con.c).cgs
+# fRPThickConstant = ((1 - np.exp(-tauThickConst)) * lBol / con.c).cgs
+# fRPThin = ((1 - np.exp(-tauThin)) * lBol / con.c).cgs
+# fRPThick = ((1 - np.exp(-tauThick)) * lBol / con.c).cgs
 
-fig, (ax1) = plt.subplots(1, 1, dpi = 200, facecolor="white")
+# fig, (ax1) = plt.subplots(1, 1, dpi = 200, facecolor="white")
 
-ax1.plot(rSpan, fDiff001/fRPThinConstant, 'k', label = r"Constant $\tau_{\rm RP}$, optically thin")
-ax1.plot(rSpan, fDiff001/fRPThickConstant, 'k--', label = r"Constant $\tau_{\rm RP}$, optically thick")
-ax1.plot(rSpan, fDiff001/fRPThin, 'b', label = r"Decreasing $\tau_{\rm RP}$, optically thin")
-ax1.plot(rSpan, fDiff001/fRPThick, 'b--', label = r"Decreasing $\tau_{\rm RP}$, optically thick")
+# ax1.plot(rSpan, fDiff001/fRPThinConstant, 'k', label = r"Constant $\tau_{\rm RP}$, optically thin")
+# ax1.plot(rSpan, fDiff001/fRPThickConstant, 'k--', label = r"Constant $\tau_{\rm RP}$, optically thick")
+# ax1.plot(rSpan, fDiff001/fRPThin, 'b', label = r"Decreasing $\tau_{\rm RP}$, optically thin")
+# ax1.plot(rSpan, fDiff001/fRPThick, 'b--', label = r"Decreasing $\tau_{\rm RP}$, optically thick")
 
-# ax2.plot(rSpan, fDiff03/fRPThinConstant, 'k', label = r"Constant $\tau_{\rm RP}$, optically thin")
-# ax2.plot(rSpan, fDiff03/fRPThickConstant, 'k--', label = r"Constant $\tau_{\rm RP}$, optically thick")
-# ax2.plot(rSpan, fDiff03/fRPThin, 'b', label = r"Decreasing $\tau_{\rm RP}$, optically thin")
-# ax2.plot(rSpan, fDiff03/fRPThick, 'b--', label = r"Decreasing $\tau_{\rm RP}$, optically thick")
+# # ax2.plot(rSpan, fDiff03/fRPThinConstant, 'k', label = r"Constant $\tau_{\rm RP}$, optically thin")
+# # ax2.plot(rSpan, fDiff03/fRPThickConstant, 'k--', label = r"Constant $\tau_{\rm RP}$, optically thick")
+# # ax2.plot(rSpan, fDiff03/fRPThin, 'b', label = r"Decreasing $\tau_{\rm RP}$, optically thin")
+# # ax2.plot(rSpan, fDiff03/fRPThick, 'b--', label = r"Decreasing $\tau_{\rm RP}$, optically thick")
 
-ax1.legend()
+# ax1.legend()
 
-ax1.set_xscale('log')
-ax1.set_yscale('log')
+# ax1.set_xscale('log')
+# ax1.set_yscale('log')
 
-# ax2.set_xscale('log')
-# ax2.set_yscale('log')
+# # ax2.set_xscale('log')
+# # ax2.set_yscale('log')
 
-# ax2.set_yticks([])
+# # ax2.set_yticks([])
 
-ax1.set_ylim(0.001,10**6)
-# ax2.set_ylim(0.001,10**6)
+# ax1.set_ylim(0.001,10**6)
+# # ax2.set_ylim(0.001,10**6)
 
-ax1.set_xlabel("Radius (pc)")
-ax1.set_ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm RP}$")
+# ax1.set_xlabel("Radius (pc)")
+# ax1.set_ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm RP}$")
 
-# ax2.set_xlabel("Radius (pc)")
-# %%
-# CR to ionized force ratio
+# # ax2.set_xlabel("Radius (pc)")
+# # %%
+# # CR to ionized force ratio
 
-modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
-modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
-modelThree = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.001)
-modelFour = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.1)
-modelFive = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=1)
+# modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+# modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
+# modelThree = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.001)
+# modelFour = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.1)
+# modelFive = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=1)
 
-regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**6, massShell=10**5)
+# regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**6, massShell=10**5)
 
-rSpan = np.logspace(1,4,50000) * u.pc
+# rSpan = np.logspace(1,4,50000) * u.pc
 
-clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
+# clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
 
-eDotWind = modelOne.BPASSData.eDotWind[i] * clusterRatio
-eDotCR = modelOne.windToCREnergyFraction * eDotWind
+# eDotWind = modelOne.BPASSData.eDotWind[0] * clusterRatio
+# eDotCR = modelOne.windToCREnergyFraction * eDotWind
 
-fDiff0001 = (eDotCR * rSpan/(con.c * modelThree.meanFreePath)).cgs
-fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
-fDiff01 = (eDotCR * rSpan/(con.c * modelFour.meanFreePath)).cgs
-fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
-fDiff1 = (eDotCR * rSpan/(con.c * modelFive.meanFreePath)).cgs
+# fDiff0001 = (eDotCR * rSpan/(con.c * modelThree.meanFreePath)).cgs
+# fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
+# fDiff01 = (eDotCR * rSpan/(con.c * modelFour.meanFreePath)).cgs
+# fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
+# fDiff1 = (eDotCR * rSpan/(con.c * modelFive.meanFreePath)).cgs
 
-fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
+# fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
 
-plt.figure(dpi = 200, facecolor="white")
+# plt.figure(dpi = 200, facecolor="white")
 
-plt.plot(rSpan, fDiff0001/fIon, 'k', label = r"$\lambda = 0.001$ pc")
-plt.plot(rSpan, fDiff001/fIon, 'b', label = r"$\lambda = 0.01$ pc")
-plt.plot(rSpan, fDiff01/fIon, 'r', label = r"$\lambda = 0.1$ pc")
-plt.plot(rSpan, fDiff03/fIon, 'g', label = r"$\lambda = 0.3$ pc")
-plt.plot(rSpan, fDiff1/fIon, 'c', label = r"$\lambda = 1$ pc")
+# plt.plot(rSpan, fDiff0001/fIon, 'k', label = r"$\lambda = 0.001$ pc")
+# plt.plot(rSpan, fDiff001/fIon, 'b', label = r"$\lambda = 0.01$ pc")
+# plt.plot(rSpan, fDiff01/fIon, 'r', label = r"$\lambda = 0.1$ pc")
+# plt.plot(rSpan, fDiff03/fIon, 'g', label = r"$\lambda = 0.3$ pc")
+# plt.plot(rSpan, fDiff1/fIon, 'c', label = r"$\lambda = 1$ pc")
 
-plt.legend()
+# plt.legend()
 
-plt.xscale('log')
-plt.yscale('log')
+# plt.xscale('log')
+# plt.yscale('log')
 
-plt.xlabel("Radius (pc)")
-plt.ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm ion}$")
-# %%
-## Plot force ratios using the better of two 
+# plt.xlabel("Radius (pc)")
+# plt.ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm ion}$")
+# # %%
+# ## Plot force ratios using the better of two 
 
-modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
-modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
-modelThree = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.001)
-modelFour = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.1)
-modelFive = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=1)
+# modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+# modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
+# modelThree = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.001)
+# modelFour = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.1)
+# modelFive = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=1)
 
-regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**6, massShell=10**5)
+# regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**6, massShell=10**5)
 
-rSpan = np.logspace(1,4,50000) * u.pc
+# rSpan = np.logspace(1,4,50000) * u.pc
 
-clusterRatio = (regionOne.massNewStars/(10**6 * u.Msun)).cgs
+# clusterRatio = (regionOne.massNewStars/(10**6 * u.Msun)).cgs
 
-tauThin = 0.1 * rSpan[0]**2/rSpan**2
-tauThick = 10 * rSpan[0]**2/rSpan**2
+# tauThin = 0.1 * rSpan[0]**2/rSpan**2
+# tauThick = 10 * rSpan[0]**2/rSpan**2
 
-lBol = regionOne.luminosity.cgs
-eDotWind = (modelOne.BPASSData.eDotWind[0] * clusterRatio).cgs
+# lBol = regionOne.luminosity.cgs
+# eDotWind = (modelOne.BPASSData.eDotWind[0] * clusterRatio).cgs
 
-fCR0001, rCritical0001, diffusion0001, _  = returnCRForce(rSpan, modelThree, regionOne)
-fCR001, rCritical001, diffusion001, _  = returnCRForce(rSpan, modelOne, regionOne)
-fCR01, rCritical01, diffusion01, _  = returnCRForce(rSpan, modelFour, regionOne)
-fCR03, rCritical03, diffusion03, _  = returnCRForce(rSpan, modelTwo, regionOne)
+# fCR0001, rCritical0001, diffusion0001, _  = returnCRForce(rSpan, modelThree, regionOne)
+# fCR001, rCritical001, diffusion001, _  = returnCRForce(rSpan, modelOne, regionOne)
+# fCR01, rCritical01, diffusion01, _  = returnCRForce(rSpan, modelFour, regionOne)
+# fCR03, rCritical03, diffusion03, _  = returnCRForce(rSpan, modelTwo, regionOne)
 
-fRPThin = ((1 - np.exp(-tauThin)) * lBol / con.c).cgs
-fRPThick = ((1 - np.exp(-tauThick)) * lBol / con.c).cgs
+# fRPThin = ((1 - np.exp(-tauThin)) * lBol / con.c).cgs
+# fRPThick = ((1 - np.exp(-tauThick)) * lBol / con.c).cgs
 
-fWind = np.sqrt(2 * eDotWind * modelOne.BPASSData.mDotWind[0]).cgs
+# fWind = np.sqrt(2 * eDotWind * modelOne.BPASSData.mDotWind[0]).cgs
 
-fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
+# fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
 
-one = np.ones_like(rSpan)
+# one = np.ones_like(rSpan)
 
-fig, ax = plt.subplots(2,2, dpi = 200, facecolor="white")
+# fig, ax = plt.subplots(2,2, dpi = 200, facecolor="white")
 
-ax[0,0].plot(rSpan, fCR0001/fIon)
-ax[0,0].plot(rSpan, fCR0001/fWind)
-ax[0,0].plot(rSpan, fCR0001/fRPThin)
-ax[0,0].plot(rSpan, fCR0001/fRPThick)
+# ax[0,0].plot(rSpan, fCR0001/fIon)
+# ax[0,0].plot(rSpan, fCR0001/fWind)
+# ax[0,0].plot(rSpan, fCR0001/fRPThin)
+# ax[0,0].plot(rSpan, fCR0001/fRPThick)
 
-ax[0,1].plot(rSpan, fCR001/fIon)
-ax[0,1].plot(rSpan, fCR001/fWind)
-ax[0,1].plot(rSpan, fCR001/fRPThin)
-ax[0,1].plot(rSpan, fCR001/fRPThick)
+# ax[0,1].plot(rSpan, fCR001/fIon)
+# ax[0,1].plot(rSpan, fCR001/fWind)
+# ax[0,1].plot(rSpan, fCR001/fRPThin)
+# ax[0,1].plot(rSpan, fCR001/fRPThick)
 
-ax[1,0].plot(rSpan, fCR01/fIon)
-ax[1,0].plot(rSpan, fCR01/fWind)
-ax[1,0].plot(rSpan, fCR01/fRPThin)
-ax[1,0].plot(rSpan, fCR01/fRPThick)
+# ax[1,0].plot(rSpan, fCR01/fIon)
+# ax[1,0].plot(rSpan, fCR01/fWind)
+# ax[1,0].plot(rSpan, fCR01/fRPThin)
+# ax[1,0].plot(rSpan, fCR01/fRPThick)
 
-ax[1,1].plot(rSpan, fCR03/fIon)
-ax[1,1].plot(rSpan, fCR03/fWind)
-ax[1,1].plot(rSpan, fCR03/fRPThin)
-ax[1,1].plot(rSpan, fCR03/fRPThick)
+# ax[1,1].plot(rSpan, fCR03/fIon)
+# ax[1,1].plot(rSpan, fCR03/fWind)
+# ax[1,1].plot(rSpan, fCR03/fRPThin)
+# ax[1,1].plot(rSpan, fCR03/fRPThick)
 
-ax[0,0].plot(rSpan, one, 'k--', alpha = 0.5)
-ax[0,1].plot(rSpan, one, 'k--', alpha = 0.5)
-ax[1,0].plot(rSpan, one, 'k--', alpha = 0.5)
-ax[1,1].plot(rSpan, one, 'k--', alpha = 0.5)
+# ax[0,0].plot(rSpan, one, 'k--', alpha = 0.5)
+# ax[0,1].plot(rSpan, one, 'k--', alpha = 0.5)
+# ax[1,0].plot(rSpan, one, 'k--', alpha = 0.5)
+# ax[1,1].plot(rSpan, one, 'k--', alpha = 0.5)
 
-# ax[0,0].legend(bbox_to_anchor=(2.5, 1))
+# # ax[0,0].legend(bbox_to_anchor=(2.5, 1))
 
-ax[0,0].set_xscale('log')
-ax[0,0].set_yscale('log')
+# ax[0,0].set_xscale('log')
+# ax[0,0].set_yscale('log')
 
-ax[0,1].set_xscale('log')
-ax[0,1].set_yscale('log')
+# ax[0,1].set_xscale('log')
+# ax[0,1].set_yscale('log')
 
-ax[1,0].set_xscale('log')
-ax[1,0].set_yscale('log')
+# ax[1,0].set_xscale('log')
+# ax[1,0].set_yscale('log')
 
-ax[1,1].set_xscale('log')
-ax[1,1].set_yscale('log')
+# ax[1,1].set_xscale('log')
+# ax[1,1].set_yscale('log')
 
-# ax[0,1].set_yticks([])
-# ax[1,1].set_yticks([])
+# # ax[0,1].set_yticks([])
+# # ax[1,1].set_yticks([])
 
-# ax[0,0].set_ylim(0.001,10**6)
-# ax[0,1].set_ylim(0.001,10**6)
+# # ax[0,0].set_ylim(0.001,10**6)
+# # ax[0,1].set_ylim(0.001,10**6)
 
-ax[0,0].set_ylabel("Ratio of forces")
-ax[1,0].set_ylabel("Ratio of forces")
+# ax[0,0].set_ylabel("Ratio of forces")
+# ax[1,0].set_ylabel("Ratio of forces")
 
-ax[1,0].set_xlabel("Radius (pc)")
-ax[1,1].set_xlabel("Radius (pc)")
+# ax[1,0].set_xlabel("Radius (pc)")
+# ax[1,1].set_xlabel("Radius (pc)")
 
-# %%
-# Figure 2 - CR to RP force ratio
+# # %%
+# # Figure 2 - CR to RP force ratio
 
-modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
-modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
+# modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+# modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
 
-regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
-regionTwo = region("10^4 Mcl 10^5 Mshell", massNewStars=10**6, massShell=10**6)
+# regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
+# regionTwo = region("10^4 Mcl 10^5 Mshell", massNewStars=10**6, massShell=10**6)
   
-rSpan = np.logspace(1,3,50000) * u.pc
+# rSpan = np.logspace(1,3,50000) * u.pc
 
-clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
+# clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
 
-eDotWind = modelOne.BPASSData.eDotWind[i] * clusterRatio
-eDotCR = modelOne.windToCREnergyFraction * eDotWind
+# eDotWind = modelOne.BPASSData.eDotWind[0] * clusterRatio
+# eDotCR = modelOne.windToCREnergyFraction * eDotWind
 
-fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
-fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
+# fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
+# fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
 
-fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
+# fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
 
-fig, (ax1) = plt.subplots(1, 1, dpi = 200, facecolor="white")
+# fig, (ax1) = plt.subplots(1, 1, dpi = 200, facecolor="white")
 
-ax1.plot(rSpan, fDiff001/fIon, 'k', label = r"$M_{\rm star} = 10^4, \lambda = 0.001$ pc")
-ax1.plot(rSpan, fDiff03/fIon, 'k--', label = r"$M_{\rm star} = 10^4, \lambda = 0.03$ pc")
+# ax1.plot(rSpan, fDiff001/fIon, 'k', label = r"$M_{\rm star} = 10^4, \lambda = 0.001$ pc")
+# ax1.plot(rSpan, fDiff03/fIon, 'k--', label = r"$M_{\rm star} = 10^4, \lambda = 0.03$ pc")
 
-clusterRatio = regionTwo.massNewStars/(10**6 * u.Msun)
+# clusterRatio = regionTwo.massNewStars/(10**6 * u.Msun)
 
-eDotWind = modelOne.BPASSData.eDotWind[i] * clusterRatio
-eDotCR = modelOne.windToCREnergyFraction * eDotWind
+# eDotWind = modelOne.BPASSData.eDotWind[0] * clusterRatio
+# eDotCR = modelOne.windToCREnergyFraction * eDotWind
 
-fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
-fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
+# fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
+# fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
 
-fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
+# fIon = (np.sqrt(12 * math.pi * modelOne.BPASSData.ionRate[0] * clusterRatio * phi * rSpan / alphaB) * con.k_B * T).cgs
 
-ax1.plot(rSpan, fDiff001/fIon, 'b', label = r"$M_{\rm star} = 10^6, \lambda = 0.001$ pc")
-ax1.plot(rSpan, fDiff03/fIon, 'b--', label = r"$M_{\rm star} = 10^6, \lambda = 0.03$ pc")
+# ax1.plot(rSpan, fDiff001/fIon, 'b', label = r"$M_{\rm star} = 10^6, \lambda = 0.001$ pc")
+# ax1.plot(rSpan, fDiff03/fIon, 'b--', label = r"$M_{\rm star} = 10^6, \lambda = 0.03$ pc")
 
-ax1.legend()
+# ax1.legend()
 
-ax1.set_xscale('log')
-ax1.set_yscale('log')
+# ax1.set_xscale('log')
+# ax1.set_yscale('log')
 
-ax1.set_ylim(0.0001,10)
+# ax1.set_ylim(0.0001,10)
 
-ax1.set_xlabel("Radius (pc)")
-ax1.set_ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm ion}$")
+# ax1.set_xlabel("Radius (pc)")
+# ax1.set_ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm ion}$")
 
-# %%
-modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
-modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
+# # %%
+# modelOne = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True)
+# modelTwo = model("All Forces", radiationPressure=True, windPressure=True, ionPressure=True, meanFreePath=0.3)
 
-regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
+# regionOne = region("10^4 Mcl 10^5 Mshell", massNewStars=10**4, massShell=10**5)
 
   
-rSpan = np.logspace(1,3,50000) * u.pc
+# rSpan = np.logspace(1,3,50000) * u.pc
 
-clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
+# clusterRatio = regionOne.massNewStars/(10**6 * u.Msun)
 
-eDotWind = modelOne.BPASSData.eDotWind[i] * clusterRatio
-eDotCR = modelOne.windToCREnergyFraction * eDotWind
-mDotWind = modelOne.BPASSData.mDotWind[0] * clusterRatio
+# eDotWind = modelOne.BPASSData.eDotWind[0] * clusterRatio
+# eDotCR = modelOne.windToCREnergyFraction * eDotWind
+# mDotWind = modelOne.BPASSData.mDotWind[0] * clusterRatio
 
-fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
-fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
+# fDiff001 = (eDotCR * rSpan/(con.c * modelOne.meanFreePath)).cgs
+# fDiff03 = (eDotCR * rSpan/(con.c * modelTwo.meanFreePath)).cgs
 
-fWind = np.sqrt(2 * eDotWind * mDotWind).cgs
+# fWind = np.sqrt(2 * eDotWind * mDotWind).cgs
 
-fig, (ax1) = plt.subplots(1, 1, dpi = 200, facecolor="white")
+# fig, (ax1) = plt.subplots(1, 1, dpi = 200, facecolor="white")
 
-ax1.plot(rSpan, fDiff001/fWind, 'k', label = r"$\lambda = 0.001$ pc")
-ax1.plot(rSpan, fDiff03/fWind, 'k--', label = r"$\lambda = 0.03$ pc")
+# ax1.plot(rSpan, fDiff001/fWind, 'k', label = r"$\lambda = 0.001$ pc")
+# ax1.plot(rSpan, fDiff03/fWind, 'k--', label = r"$\lambda = 0.03$ pc")
 
-ax1.set_xscale('log')
-ax1.set_yscale('log')
+# ax1.set_xscale('log')
+# ax1.set_yscale('log')
 
-ax1.legend()
+# ax1.legend()
 
-ax1.set_ylim(0.001,20)
+# ax1.set_ylim(0.001,20)
 
-ax1.set_xlabel("Radius (pc)")
-ax1.set_ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm wind}$")
+# ax1.set_xlabel("Radius (pc)")
+# ax1.set_ylabel(r"Ratio of forces $F_{\rm CR}/F_{\rm wind}$")
 
 # %%
